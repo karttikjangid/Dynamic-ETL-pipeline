@@ -57,7 +57,7 @@ def process_upload(file_path: str, source_id: str) -> UploadResponse:
             parsed_fragments_summary=fragment_stats,
         )
 
-    extracted_payloads: List[Dict[str, Any]] = [record.dict() for record in extracted_records]
+    extracted_payloads: List[Dict[str, Any]] = [record.model_dump() for record in extracted_records]
 
     try:
         normalized_records = normalize_all_records(extracted_payloads)

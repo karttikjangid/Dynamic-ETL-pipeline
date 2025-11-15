@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pymongo import ASCENDING, DESCENDING
 from pymongo.errors import PyMongoError
@@ -30,7 +30,7 @@ def store_schema(db, schema: SchemaMetadata) -> bool:
     """Persist schema metadata to the schema collection."""
 
     collection = _get_collection(db)
-    payload = schema.dict()
+    payload = schema.model_dump()
     payload.update({"_id": schema.schema_id})
     try:
         collection.replace_one({"_id": schema.schema_id}, payload, upsert=True)
@@ -46,7 +46,7 @@ def retrieve_schema(
     """Fetch a schema by source id and optional version."""
 
     collection = _get_collection(db)
-    query = {"source_id": source_id}
+    query: Dict[str, Any] = {"source_id": source_id}
     sort = [("version", DESCENDING)]
     if version is not None:
         query["version"] = version
