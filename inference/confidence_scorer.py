@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
+from .type_mapper import infer_type
+
 
 def compute_confidence(type_counts: Dict[str, int], total_observations: int) -> float:
     """Calculate confidence score based on type distribution.
@@ -169,8 +171,6 @@ def calculate_field_confidence(
         >>> calculate_field_confidence(records, "age", "integer")
         1.0
     """
-    from .type_mapper import infer_type
-    
     if not records:
         return 0.0
     
@@ -258,8 +258,6 @@ def check_type_consistency(
         >>> check_type_consistency(records, "age", "integer")
         0.667
     """
-    from .type_mapper import infer_type
-    
     if not records:
         return 0.0
     

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List
+from uuid import uuid4
 
 from core import SchemaField, SchemaMetadata
 
@@ -37,8 +38,6 @@ def generate_schema(
         >>> len(schema.fields)
         3
     """
-    from uuid import uuid4
-    
     # Handle empty records
     if not records:
         return SchemaMetadata(
