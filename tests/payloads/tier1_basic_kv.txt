@@ -1,0 +1,24 @@
+# Tier 1 Test: Basic KV Extraction
+
+This file contains simple key-value pairs to test basic KV extraction.
+
+## Test Case 1: Server Configuration
+server_name: prod-web-01
+ip_address: 192.168.1.100
+port: 8080
+protocol: HTTPS
+status: active
+
+## Test Case 2: User Profile
+user_id: 12345
+full_name: Charlie Brown
+email: charlie@example.com
+role: administrator
+last_login: 2024-11-15
+
+## Test Case 3: Device Info
+device_id: DEV-9876
+model: iPhone 15 Pro
+os_version: iOS 17.2
+battery_level: 85
+location: San Francisco
