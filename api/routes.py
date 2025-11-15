@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, FastAPI, Query
+from fastapi import APIRouter, Body, FastAPI, File, Form, Query, UploadFile
 
 from .handlers import (
     handle_get_records,
@@ -29,9 +29,13 @@ def _build_router() -> APIRouter:
     router = APIRouter()
 
     @router.post("/upload")
-    async def upload_endpoint(payload: dict = Body(...)):
-        validate_upload_payload(payload)
-        return await handle_upload(payload)
+    async def upload_endpoint(
+        file: UploadFile = File(...),
+        source_id: str | None = Form(None),
+        version: int | None = Form(None),
+    ):
+        normalized_payload = validate_upload_payload(file, source_id, version)
+        return await handle_upload(file, normalized_payload["source_id"], normalized_payload["version"])
 
     @router.get("/schema")
     async def schema_endpoint(source_id: str = Query(...)):
@@ -42,8 +46,12 @@ def _build_router() -> APIRouter:
         return await handle_get_schema_history(source_id)
 
     @router.get("/records")
-    async def records_endpoint(source_id: str = Query(...), limit: int = Query(100, ge=1, le=1000)):
-        return await handle_get_records(source_id, limit)
+    async def records_endpoint(
+        source_id: str = Query(...),
+        query_id: str | None = Query(None),
+        limit: int = Query(100, ge=1, le=1000),
+    ):
+        return await handle_get_records(source_id, limit, query_id)
 
     @router.post("/query")
     async def query_endpoint(source_id: str = Query(...), query: dict = Body(...)):
