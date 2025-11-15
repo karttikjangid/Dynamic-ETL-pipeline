@@ -15,7 +15,7 @@ def parse_file(file_path: str) -> str:
         return parse_md_file(file_path)
     if suffix == ".txt":
         return parse_txt_file(file_path)
-    raise ValueError(f"Unsupported file type: {suffix}")
+    raise NotImplementedError(f"Unsupported file type: {suffix}")
 
 
 def parse_txt_file(file_path: str) -> str:

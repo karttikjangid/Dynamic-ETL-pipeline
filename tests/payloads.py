@@ -490,7 +490,260 @@ MORE_NOISE_TEXT_TO_IGNORE
 12345 !@#$%^&*()
 
 final_field: final_value
-end_marker: true"""
+end_marker: true""",
+
+    "tier_a_01_kv_and_json": """Daily Finance Snapshot
+source_id: a-01
+owner: analytics-test
+
+{
+  "transaction_id": "A01-TXN-001",
+  "amount": 45.67,
+  "currency": "USD",
+  "items": ["sku-1", "sku-2"],
+  "metadata": {"channel": "email"}
+}
+
+summary: Baseline Tier A-01 test
+notes: Expect KV + JSON fragments
+""",
+
+    "tier_a_02_markdown_code_block": """# Billing Report
+
+Intro paragraph describing the upload.
+
+```json
+{
+  "user_id": 8888,
+  "username": "tier_a_code",
+  "tier": "A-02",
+  "email": "code@tier.test"
+}
+```
+
+status: ready
+section: markdown
+""",
+
+    "tier_a_03_csv_like_text": """user_id,plan,price
+1001,Basic,9.99
+1002,Plus,19.99
+1003,Pro,29.99
+
+table_hint: csv_like_rows
+
+{
+  "csv_metadata": {
+    "records": 3,
+    "columns": ["user_id", "plan", "price"]
+  },
+  "tier": "A-03"
+}
+
+source_id: tier-a-03
+""",
+
+    "tier_a_04_html_snippet": """<table>
+  <tr><th>name</th><th>value</th></tr>
+  <tr><td>alpha</td><td>10</td></tr>
+  <tr><td>beta</td><td>20</td></tr>
+</table>
+
+{
+  "table_summary": {
+    "rows": 2,
+    "columns": ["name", "value"]
+  },
+  "tier": "A-04"
+}
+
+html_hint: single_table
+parser: html_snippet
+""",
+
+    "tier_a_05_pdf_like_text": """INVOICE SUMMARY
+Document ID: DOC-9001
+Prepared For: Minimal PDF Fixture
+Prepared By: QA Team
+Total Amount: 199.99
+Currency: USD
+
+This content simulates text extracted from a lightweight PDF without any images.
+No OCR should be required as the text is plain and searchable.
+
+extracted_by: text_layer
+document_type: pdf
+""",
+
+    "tier_a_08_malformed_json": """Malformed JSON example
+
+{
+  "id": "BROKEN-JSON-1",
+  "message": "trailing comma causes parse error",
+  "tier": "A-08",
+}
+
+status: should surface error metadata
+""",
+
+    "tier_b_01_mixed_formats": """{
+  "inventory_id": "INV-001",
+  "location": "warehouse-7",
+  "status": "active"
+}
+
+<table>
+  <tr><th>sku</th><th>qty</th><th>price</th></tr>
+  <tr><td>SKU-1</td><td>10</td><td>15.50</td></tr>
+  <tr><td>SKU-2</td><td>5</td><td>9.99</td></tr>
+</table>
+
+sku,qty,price
+SKU-3,2,5.25
+SKU-4,1,99.00
+
+source_system: omni_ingest
+collection_hint: inventory
+tier: B-01
+""",
+
+    "tier_b_02_frontmatter_inline_html": """---
+title: Release Notes
+version: 1.4.0
+publish_date: 2024-10-01
+author: Docs Bot
+---
+
+<div class="summary">
+  <h1>Release Details</h1>
+  <p>Status: draft</p>
+</div>
+
+{
+  "summary": {
+    "section": "inline-html",
+    "tier": "B-02"
+  }
+}
+
+status: ready
+approver: qa_lead
+""",
+
+    "tier_b_03_html_with_scripts": """<!-- Comment block -->
+<div>
+  <p>Customer profile snippet</p>
+</div>
+
+<script>
+  var injected = {"should": "not execute"};
+</script>
+
+{
+  "customer_id": "B03-100",
+  "status": "active",
+  "tier": "B-03"
+}
+
+page_section: script-heavy
+""",
+
+    "tier_b_04_multiple_json_fragments": """{
+  "record": 1,
+  "status": "ok"
+}
+
+{
+  "record": 2,
+  "status": "ok"
+}
+
+{
+  "record": 3,
+  "status": "oops",
+  "detail": "trailing comma",
+}
+
+meta: includes malformed fragment
+tier: B-04
+""",
+
+    "tier_b_05_inline_sql": """```sql
+CREATE TABLE nightly_rollup (
+  id INT PRIMARY KEY,
+  total DECIMAL(10,2)
+);
+
+DROP TABLE IF EXISTS legacy_data;
+```
+
+system: analytics
+environment: staging
+owner: etl
+tier: B-05
+""",
+
+    "tier_b_06_csv_inconsistent_quotes": """id,name,notes
+1,"Alice, CEO","\"Quoted\" value"
+2,"Bob","Missing end quote
+3,Charlie,"Proper"
+
+summary: inconsistent csv quoting
+tier: B-06
+
+{
+  "csv_hint": "inconsistent_quotes"
+}
+""",
+
+    "tier_b_07_mixed_delimiter_block": """product;price;region
+SKU-1;10.5;US
+SKU-2;12.0;EU
+
+product,price,region
+SKU-3,15.0,APAC
+SKU-4,8.5,US
+
+report_id: MIX-DELIM
+record_count: 4
+tier: B-07
+""",
+
+    "tier_b_08_markdown_nested_lists": """## Data points
+
+- region: NA
+  - customers: 120
+  - revenue: 1500
+- region: EU
+  - customers: 80
+  - revenue: 1100
+
+Inline JSON example {"tier": "B-08", "regions": 2}
+
+summary: nested lists with inline json
+""",
+
+    "tier_b_09_timezone_date_mix": """{
+  "iso_date": "2024-01-05",
+  "us_date": "01/05/2024",
+  "eu_date": "05/01/2024",
+  "iso_datetime": "2024-01-05T08:30:00Z"
+}
+
+observed_at: 2024-01-05T08:30:00-05:00
+localized_note: Dates appear in multiple formats.
+tier: B-09
+""",
+
+    "tier_b_10_multi_separator_kv": """priority: high
+owner: data-team
+retry_mode: enabled
+alert_level: P1
+window: nightly
+
+note: original spec mentioned multiple separators; normalized to colon for extractor
+tier: B-10
+"""
 }
 
 if __name__ == "__main__":
