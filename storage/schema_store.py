@@ -13,7 +13,9 @@ def store_schema(db, schema: SchemaMetadata) -> bool:
     raise NotImplementedError
 
 
-def retrieve_schema(db, source_id: str, version: Optional[int] = None) -> Optional[SchemaMetadata]:
+def retrieve_schema(
+    db, source_id: str, version: Optional[int] = None
+) -> Optional[SchemaMetadata]:
     """Fetch a schema by source id and optional version."""
 
     raise NotImplementedError

@@ -13,7 +13,9 @@ def insert_documents(db, name: str, docs: List[Dict]) -> int:
     raise NotImplementedError
 
 
-def batch_insert_documents(db, name: str, docs: List[Dict], batch_size: int = 100) -> int:
+def batch_insert_documents(
+    db, name: str, docs: List[Dict], batch_size: int = 100
+) -> int:
     """Insert documents in batches for efficiency."""
 
     raise NotImplementedError

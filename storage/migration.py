@@ -25,13 +25,17 @@ def find_removed_fields(old_fields: List[str], new_fields: List[str]) -> List[st
     raise NotImplementedError
 
 
-def find_type_changes(old_schema: SchemaMetadata, new_schema: SchemaMetadata) -> Dict[str, Dict[str, str]]:
+def find_type_changes(
+    old_schema: SchemaMetadata, new_schema: SchemaMetadata
+) -> Dict[str, Dict[str, str]]:
     """Return changed field types."""
 
     raise NotImplementedError
 
 
-def evolve_collection_schema(db, name: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata) -> bool:
+def evolve_collection_schema(
+    db, name: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata
+) -> bool:
     """Apply schema evolution operations."""
 
     raise NotImplementedError

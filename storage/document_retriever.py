@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 
-def get_documents(db, name: str, limit: int = 100, filter_query: Optional[Dict] = None) -> List[Dict]:
+def get_documents(
+    db, name: str, limit: int = 100, filter_query: Optional[Dict] = None
+) -> List[Dict]:
     """Fetch a limited set of documents."""
 
     raise NotImplementedError

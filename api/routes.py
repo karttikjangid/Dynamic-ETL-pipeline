@@ -42,7 +42,9 @@ def _build_router() -> APIRouter:
         return await handle_get_schema_history(source_id)
 
     @router.get("/records")
-    async def records_endpoint(source_id: str = Query(...), limit: int = Query(100, ge=1, le=1000)):
+    async def records_endpoint(
+        source_id: str = Query(...), limit: int = Query(100, ge=1, le=1000)
+    ):
         return await handle_get_records(source_id, limit)
 
     @router.post("/query")

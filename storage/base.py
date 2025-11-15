@@ -20,7 +20,9 @@ class BaseStorage(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_documents(self, name: str, limit: int, filter_query: Optional[Dict] = None) -> List[Dict]:
+    def get_documents(
+        self, name: str, limit: int, filter_query: Optional[Dict] = None
+    ) -> List[Dict]:
         raise NotImplementedError
 
     @abstractmethod
