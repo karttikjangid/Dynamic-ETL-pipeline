@@ -16,7 +16,9 @@ def get_logger(name: str = "dynamic_etl") -> logging.Logger:
         _LOGGER = logging.getLogger(name)
         if not _LOGGER.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             handler.setFormatter(formatter)
             _LOGGER.addHandler(handler)
         _LOGGER.setLevel(logging.INFO)

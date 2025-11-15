@@ -17,7 +17,9 @@ def get_schema_history(source_id: str) -> GetSchemaHistoryResponse:
     raise NotImplementedError
 
 
-def handle_schema_evolution(source_id: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata) -> bool:
+def handle_schema_evolution(
+    source_id: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata
+) -> bool:
     """Apply schema evolution procedures when needed."""
 
     raise NotImplementedError

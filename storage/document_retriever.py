@@ -13,7 +13,9 @@ from utils.logger import get_logger
 _LOGGER = get_logger(__name__)
 
 
-def get_documents(db, name: str, limit: int = 100, filter_query: Optional[Dict] = None) -> List[Dict]:
+def get_documents(
+    db, name: str, limit: int = 100, filter_query: Optional[Dict] = None
+) -> List[Dict]:
     """Fetch a limited set of documents."""
 
     collection = db[name]
