@@ -143,7 +143,7 @@ def test_tier_b08_markdown_nested_lists(tmp_path):
 
     schema = schema_service.get_current_schema(source_id)
     field_names = {field.name for field in schema.fields}
-    assert {"region", "customers", "revenue", "summary"}.intersection(field_names)
+    assert {"region", "customers", "revenue", "summary"}.issubset(field_names)
 
 
 @pytest.mark.integration
