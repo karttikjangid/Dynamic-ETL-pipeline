@@ -24,25 +24,36 @@ class MongoConnection:
     def connect(self) -> MongoClient:
         """Establish a new Mongo client."""
 
-        raise NotImplementedError
+        if self._client is None:
+            self._client = MongoClient(self._uri)
+        return self._client
 
     def disconnect(self) -> None:
         """Close the Mongo client if present."""
 
-        raise NotImplementedError
+        if self._client is not None:
+            self._client.close()
+            self._client = None
 
     def get_client(self) -> MongoClient:
         """Return the active Mongo client, connecting if necessary."""
 
-        raise NotImplementedError
+        if self._client is None:
+            return self.connect()
+        return self._client
 
     def get_database(self, name: str):
         """Return a database reference from the Mongo client."""
 
-        raise NotImplementedError
+        client = self.get_client()
+        return client[name]
 
     @staticmethod
     def get_instance() -> "MongoConnection":
         """Return the shared MongoConnection instance."""
 
-        raise NotImplementedError
+        if MongoConnection._instance is None:
+            with MongoConnection._lock:
+                if MongoConnection._instance is None:
+                    MongoConnection._instance = MongoConnection()
+        return MongoConnection._instance

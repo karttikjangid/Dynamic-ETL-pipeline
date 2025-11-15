@@ -1,6 +1,14 @@
 """Centralized application configuration."""
 
-from pydantic import BaseSettings
+
+from pathlib import Path
+
+from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+load_dotenv(Path(__file__).resolve().with_name(".env"))
+
 
 
 class Settings(BaseSettings):
@@ -12,9 +20,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
-    class Config:
-        env_file = ".env"
-        env_prefix = "ETL_"
+    model_config = SettingsConfigDict(env_prefix="ETL_")
 
 
 def get_settings() -> Settings:
