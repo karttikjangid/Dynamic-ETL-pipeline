@@ -63,3 +63,24 @@ Thumbs.db
 # Local tooling
 .coverage
 *.orig
+
+# Feature-specific test files
+test_*_extractor.py
+test_*_normalizer.py
+test_*.py
+
+# Demo and example files
+demo_*.py
+example_*.py
+
+# Additional Python cache
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# PyCharm
+.idea/
+
+# Ruff cache
+.ruff_cache/

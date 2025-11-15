@@ -51,7 +51,9 @@ def find_removed_fields(old_fields: List[str], new_fields: List[str]) -> List[st
     return sorted(set(old_fields) - set(new_fields))
 
 
-def find_type_changes(old_schema: SchemaMetadata, new_schema: SchemaMetadata) -> Dict[str, Dict[str, str]]:
+def find_type_changes(
+    old_schema: SchemaMetadata, new_schema: SchemaMetadata
+) -> Dict[str, Dict[str, str]]:
     """Return changed field types."""
 
     changes: Dict[str, Dict[str, str]] = {}
@@ -63,7 +65,9 @@ def find_type_changes(old_schema: SchemaMetadata, new_schema: SchemaMetadata) ->
     return changes
 
 
-def evolve_collection_schema(db, name: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata) -> bool:
+def evolve_collection_schema(
+    db, name: str, old_schema: SchemaMetadata, new_schema: SchemaMetadata
+) -> bool:
     """Apply schema evolution operations."""
 
     diff = detect_schema_change(old_schema, new_schema)

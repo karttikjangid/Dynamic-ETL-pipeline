@@ -12,7 +12,12 @@ from .models import (
     GetRecordsResponse,
     QueryResult,
 )
-from .exceptions import PipelineError, ExtractionError, NormalizationError, SchemaInferenceError
+from .exceptions import (
+    PipelineError,
+    ExtractionError,
+    NormalizationError,
+    SchemaInferenceError,
+)
 from . import constants
 
 __all__ = [

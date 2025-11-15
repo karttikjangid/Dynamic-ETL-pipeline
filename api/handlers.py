@@ -153,7 +153,9 @@ async def handle_get_records(source_id: str, limit: int, query_id: Optional[str]
     return response
 
 
-async def handle_query_execution(source_id: str, query: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_query_execution(
+    source_id: str, query: Dict[str, Any]
+) -> Dict[str, Any]:
     """Execute strict query requests."""
 
     try:

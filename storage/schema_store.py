@@ -40,7 +40,9 @@ def store_schema(db, schema: SchemaMetadata) -> bool:
         return False
 
 
-def retrieve_schema(db, source_id: str, version: Optional[int] = None) -> Optional[SchemaMetadata]:
+def retrieve_schema(
+    db, source_id: str, version: Optional[int] = None
+) -> Optional[SchemaMetadata]:
     """Fetch a schema by source id and optional version."""
 
     collection = _get_collection(db)
