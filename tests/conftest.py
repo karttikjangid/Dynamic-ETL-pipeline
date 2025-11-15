@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from typing import Generator
 
 import mongomock
 import pytest
+
+os.environ.setdefault("ETL_MONGODB_URI", "mongodb://localhost:27017")
 
 from services import pipeline_service
 from storage.connection import MongoConnection
