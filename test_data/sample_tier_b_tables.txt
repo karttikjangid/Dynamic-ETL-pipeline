@@ -1,0 +1,49 @@
+# Sample file with multiple HTML tables and CSV blocks
+
+--- HTML TABLE 1: Product Inventory ---
+<table>
+  <tr>
+    <th>sku</th>
+    <th>product_name</th>
+    <th>price</th>
+    <th>quantity</th>
+  </tr>
+  <tr>
+    <td>SKU-001</td>
+    <td>Laptop Pro</td>
+    <td>1299.99</td>
+    <td>25</td>
+  </tr>
+  <tr>
+    <td>SKU-002</td>
+    <td>Wireless Mouse</td>
+    <td>29.99</td>
+    <td>150</td>
+  </tr>
+  <tr>
+    <td>SKU-003</td>
+    <td>USB-C Cable</td>
+    <td>19.99</td>
+    <td>300</td>
+  </tr>
+</table>
+
+--- CSV BLOCK 1: Sales Data ---
+date,product_sku,units_sold,revenue
+2025-11-13,SKU-001,5,6499.95
+2025-11-13,SKU-002,12,359.88
+2025-11-14,SKU-001,3,3899.97
+2025-11-14,SKU-003,20,399.80
+2025-11-15,SKU-002,8,239.92
+
+--- HTML TABLE 2: Shipping Zones ---
+<table>
+  <thead>
+    <tr><th>zone</th><th>region</th><th>delivery_days</th><th>cost</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Zone-A</td><td>East Coast</td><td>2</td><td>9.99</td></tr>
+    <tr><td>Zone-B</td><td>West Coast</td><td>3</td><td>12.99</td></tr>
+    <tr><td>Zone-C</td><td>International</td><td>7</td><td>29.99</td></tr>
+  </tbody>
+</table>

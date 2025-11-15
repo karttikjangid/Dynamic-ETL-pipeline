@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union, cast
 from core import GetSchemaHistoryResponse, NormalizedRecord, SchemaMetadata
 from core.exceptions import SchemaInferenceError, StorageError
 from inference.schema_generator import generate_schema
+from inference.deepdiff_integration import compare_schemas_with_deepdiff, is_structural_change, convert_deepdiff_to_schema_diff
 from services import orchestrator as service_orchestrator
 from storage import migration, schema_store
 from storage.connection import MongoConnection
@@ -120,9 +121,27 @@ def get_schema_history(source_id: str) -> GetSchemaHistoryResponse:
     db = _get_db_for_source(source_id)
     schemas = schema_store.get_schema_history(db, source_id)
     diffs = []
+    
+    # Use DeepDiff for Tier-B schema comparison
     if len(schemas) > 1:
         for previous, current in zip(schemas, schemas[1:]):
-            diffs.append(migration.detect_schema_change(previous, current))
+            # Use DeepDiff if genson_schema is available (Tier-B)
+            if previous.genson_schema and current.genson_schema:
+                deepdiff_result = compare_schemas_with_deepdiff(
+                    previous.genson_schema,
+                    current.genson_schema
+                )
+                diff = convert_deepdiff_to_schema_diff(
+                    deepdiff_result,
+                    previous.fields,
+                    current.fields
+                )
+            else:
+                # Fallback to legacy diff computation (Tier-A)
+                diff = migration.detect_schema_change(previous, current)
+            
+            diffs.append(diff)
+    
     return GetSchemaHistoryResponse(schemas=schemas, diffs=diffs)
 
 

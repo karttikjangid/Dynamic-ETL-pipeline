@@ -10,6 +10,7 @@ from core import SchemaField, SchemaMetadata
 
 from .confidence_scorer import calculate_field_confidence
 from .schema_detector import detect_data_types
+from .genson_integration import generate_genson_schema, extract_fields_from_genson_schema, compute_schema_signature
 
 
 def generate_schema(
@@ -53,6 +54,9 @@ def generate_schema(
     # Detect field types across all records
     field_types = detect_data_types(records)
     
+    # Generate Genson schema for Tier-B
+    genson_schema = generate_genson_schema(records)
+    
     # Calculate confidence for each field
     field_confidences = {}
     for field_name, field_type in field_types.items():
@@ -80,7 +84,8 @@ def generate_schema(
         fields=schema_fields,
         generated_at=datetime.now(),
         record_count=len(records),
-        extraction_stats=extraction_stats
+        extraction_stats=extraction_stats,
+        genson_schema=genson_schema  # Tier-B: Store Genson schema
     )
 
 

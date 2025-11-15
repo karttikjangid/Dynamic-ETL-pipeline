@@ -2,6 +2,9 @@
 
 from api.routes import create_app
 
+# Create app instance at module level for uvicorn
+app = create_app()
+
 
 def main():
     """Initialize the API application.
@@ -11,8 +14,6 @@ def main():
     Any
         The instantiated API application (framework-agnostic placeholder).
     """
-
-    app = create_app()
     return app
 
 

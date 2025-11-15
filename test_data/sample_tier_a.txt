@@ -1,0 +1,27 @@
+# Sample Tier-A file with JSON and KV pairs
+
+--- JSON FRAGMENT 1 ---
+{
+  "user_id": 1001,
+  "username": "alice_smith",
+  "email": "alice@example.com",
+  "active": true,
+  "credits": 250.50
+}
+
+--- JSON FRAGMENT 2 ---
+{
+  "user_id": 1002,
+  "username": "bob_jones",
+  "email": "bob@example.com",
+  "active": false,
+  "credits": 100.00
+}
+
+--- KEY-VALUE SECTION ---
+product_name: Widget Pro
+product_id: WP-2024
+price: 99.99
+currency: USD
+in_stock: true
+manufacturer: TechCorp

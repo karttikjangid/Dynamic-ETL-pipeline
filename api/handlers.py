@@ -108,7 +108,7 @@ async def handle_get_schema(source_id: str) -> Dict[str, Any]:
         logger.exception("Failed to fetch schema for %s", source_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
-    response = GetSchemaResponse(schema=schema, compatible_dbs=schema.compatible_dbs)
+    response = GetSchemaResponse(schema_data=schema, compatible_dbs=schema.compatible_dbs)
     return response.dict()
 
 

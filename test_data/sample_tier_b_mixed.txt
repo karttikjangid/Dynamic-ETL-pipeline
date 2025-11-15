@@ -1,0 +1,75 @@
+# Sample Tier-B file with mixed content types
+# Source: product-scraper-v2
+
+--- METADATA ---
+source_url: https://example.com/products
+scrape_date: 2025-11-16
+scraper_version: 2.1
+
+--- JSON PRODUCT DATA ---
+{
+  "product_id": "PROD-001",
+  "name": "Smart Watch Ultra",
+  "category": "Electronics",
+  "price": 299.99,
+  "stock": 45,
+  "ratings": {
+    "average": 4.5,
+    "count": 128
+  }
+}
+
+--- HTML TABLE: Customer Reviews ---
+<table>
+  <thead>
+    <tr>
+      <th>reviewer</th>
+      <th>rating</th>
+      <th>comment</th>
+      <th>date</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>John Doe</td>
+      <td>5</td>
+      <td>Excellent product!</td>
+      <td>2025-11-10</td>
+    </tr>
+    <tr>
+      <td>Jane Smith</td>
+      <td>4</td>
+      <td>Good value for money</td>
+      <td>2025-11-12</td>
+    </tr>
+    <tr>
+      <td>Mike Johnson</td>
+      <td>5</td>
+      <td>Highly recommended</td>
+      <td>2025-11-15</td>
+    </tr>
+  </tbody>
+</table>
+
+--- CSV SECTION: Inventory Data ---
+warehouse_id,location,quantity,last_updated
+WH-001,New York,150,2025-11-16
+WH-002,Los Angeles,200,2025-11-16
+WH-003,Chicago,100,2025-11-15
+
+--- YAML METADATA ---
+---
+title: "Product Catalog Export"
+version: "2.1"
+exported_at: "2025-11-16T10:30:00"
+tags:
+  - electronics
+  - watches
+  - featured
+---
+
+--- KEY-VALUE CONFIG ---
+display_priority: high
+featured_item: true
+discount_eligible: false
+supplier_code: SUP-2024-XYZ

@@ -9,6 +9,8 @@ from core import NormalizedRecord
 
 from .json_normalizer import JSONNormalizer
 from .kv_normalizer import KVNormalizer
+from .html_normalizer import HTMLTableNormalizer
+from .csv_normalizer import CSVNormalizer
 
 
 def normalize_all_records(raw_records: List[Dict]) -> List[NormalizedRecord]:
@@ -65,32 +67,55 @@ def categorize_records(records: List[Dict]) -> Dict[str, List[Dict]]:
 def normalize_by_type(records: List[Dict], source_type: str) -> List[NormalizedRecord]:
     """Dispatch to the proper normalizer implementation.
     
-    Routes records to JSONNormalizer or KVNormalizer based on source_type.
+    Routes records to appropriate normalizer based on source_type.
     
     Args:
         records: List of ExtractedRecord dicts of the same source_type
-        source_type: "json" or "kv"
+        source_type: "json", "kv", "html_table", "csv_block", "yaml_block"
         
     Returns:
         List of NormalizedRecord objects
     """
-    # Prepare records for normalizer (extract data + metadata)
-    normalizer_input = [
-        {
-            "data": record["data"],
-            "source_type": record["source_type"],
-            "confidence": record.get("confidence", 1.0)
-        }
-        for record in records
-    ]
-    
     # Route to appropriate normalizer
     if source_type == "json":
         json_normalizer = JSONNormalizer()
-        return json_normalizer.normalize(normalizer_input)
+        return json_normalizer.normalize([r["data"] for r in records])
     elif source_type == "kv":
         kv_normalizer = KVNormalizer()
-        return kv_normalizer.normalize(normalizer_input)
+        return kv_normalizer.normalize([r["data"] for r in records])
+    elif source_type == "html_table":
+        html_normalizer = HTMLTableNormalizer()
+        # HTML normalizer needs data and metadata
+        results = []
+        for record in records:
+            metadata = record.get("metadata", {})
+            metadata["confidence"] = record.get("confidence", 0.95)
+            normalized = html_normalizer.normalize(record["data"], metadata)
+            results.extend(normalized)
+        return results
+    elif source_type == "csv_block":
+        csv_normalizer = CSVNormalizer()
+        # CSV normalizer needs data and metadata
+        results = []
+        for record in records:
+            metadata = record.get("metadata", {})
+            metadata["confidence"] = record.get("confidence", 0.9)
+            normalized = csv_normalizer.normalize(record["data"], metadata)
+            results.extend(normalized)
+        return results
+    elif source_type == "yaml_block":
+        # YAML is already structured, minimal normalization needed
+        # Just convert to NormalizedRecord format
+        results = []
+        for record in records:
+            normalized = NormalizedRecord(
+                data=record["data"],
+                source_type="yaml_block",
+                extraction_confidence=record.get("confidence", 0.95),
+                provenance=record.get("metadata", {})
+            )
+            results.append(normalized)
+        return results
     else:
         # Unknown source type - return empty list
         return []

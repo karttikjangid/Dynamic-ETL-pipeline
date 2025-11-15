@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 from config import get_settings
 from core import SchemaMetadata
+from inference.genson_integration import compute_schema_signature
 from storage import schema_store
 from storage.connection import MongoConnection
 from utils.logger import get_logger
@@ -51,8 +52,13 @@ def handle_duplicate_upload(
     if schema_to_compare is None:
         return False
 
-    old_signature = _schema_signature(schema_to_compare)
-    new_signature = _schema_signature(new_schema)
+    # Use Genson signature if available (Tier-B), otherwise fallback to field signature (Tier-A)
+    if new_schema.genson_schema and schema_to_compare.genson_schema:
+        old_signature = compute_schema_signature(schema_to_compare.genson_schema)
+        new_signature = compute_schema_signature(new_schema.genson_schema)
+    else:
+        old_signature = _schema_signature(schema_to_compare)
+        new_signature = _schema_signature(new_schema)
 
     is_duplicate = old_signature == new_signature
     if is_duplicate:
