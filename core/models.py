@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -45,7 +45,7 @@ class SchemaMetadata(BaseModel):
     generated_at: datetime
     compatible_dbs: List[str] = ["mongodb"]
     record_count: int
-    extraction_stats: Dict[str, int]
+    extraction_stats: Dict[str, Union[int, float]]
 
 
 class SchemaDiff(BaseModel):
