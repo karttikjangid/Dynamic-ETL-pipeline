@@ -2,16 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from core import GetSchemaHistoryResponse, NormalizedRecord, SchemaMetadata
+from core.exceptions import SchemaInferenceError, StorageError
 from inference.schema_generator import generate_schema
+from services import orchestrator as service_orchestrator
+from storage import migration, schema_store
+from storage.connection import MongoConnection
+from utils.logger import get_logger
+
+
+LOGGER = get_logger(__name__)
+
+
+def _get_db_for_source(source_id: str):
+    """Return the Mongo database handle for a given source id."""
+
+    db_name, _ = service_orchestrator.get_db_and_collection(source_id)
+    connection = MongoConnection.get_instance()
+    return connection.get_database(db_name)
 
 
 def compute_schema_for_source(
-    fragments: Union[List[NormalizedRecord], List[Dict[str, Any]]], 
-    source_id: str
-) -> Dict[str, Any]:
+    fragments: Union[List[NormalizedRecord], List[Dict[str, Any]]],
+    source_id: str,
+) -> SchemaMetadata:
     """
     Compute schema for a source from normalized fragments.
     
@@ -34,15 +50,7 @@ def compute_schema_for_source(
                   "orders_csv"). Used for schema tracking and versioning.
     
     Returns:
-        A dictionary containing the computed schema with keys:
-        - schema_id: Unique identifier for this schema version
-        - source_id: The source identifier passed in
-        - version: Schema version number
-        - fields: List of field definitions (name, type, nullable, etc.)
-        - generated_at: Timestamp when schema was generated
-        - record_count: Number of records analyzed
-        - extraction_stats: Statistics about the data extraction
-        - compatible_dbs: List of compatible database systems
+        SchemaMetadata instance describing the inferred schema.
     
     Example:
         >>> # From normalization pipeline
@@ -51,53 +59,71 @@ def compute_schema_for_source(
         >>> 
         >>> # From already-extracted data
         >>> data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
-        >>> schema = compute_schema_for_source(data, "users")
+    >>> schema = compute_schema_for_source(data, "users")
         >>> 
         >>> # Schema is ready for storage (but not stored by this function)
-        >>> schema_store.save(schema)  # Caller's responsibility
+    >>> schema_store.save(schema)  # Caller's responsibility
     
     Note:
-        - This function does NOT save to database/storage
-        - This function does NOT handle schema versioning logic
-        - This function does NOT perform schema evolution/migration
+    - This function does NOT save to database/storage
+    - This function does NOT handle schema versioning logic
+    - This function does NOT perform schema evolution/migration
         - All persistence operations are the caller's responsibility
         
         For full schema lifecycle management, use the higher-level
         pipeline orchestrators that call this function.
     """
     # Normalize input: extract data from NormalizedRecord objects
-    records = []
+    records: List[Dict[str, Any]] = []
     
     if not fragments:
         # Empty input, pass empty list to generator
         records = []
     elif isinstance(fragments[0], NormalizedRecord):
         # Extract .data from each NormalizedRecord
-        records = [frag.data for frag in fragments]
+        normalized = cast(List[NormalizedRecord], fragments)
+        records = [frag.data for frag in normalized]
     elif isinstance(fragments[0], dict):
         # Already in dict format
-        records = fragments
+        records = cast(List[Dict[str, Any]], fragments)
     else:
         # Unknown type, try to coerce
-        records = [dict(frag) if hasattr(frag, '__dict__') else frag for frag in fragments]
+        coerced: List[Dict[str, Any]] = []
+        for frag in fragments:
+            if hasattr(frag, "dict"):
+                coerced.append(getattr(frag, "dict")())
+            elif hasattr(frag, "__dict__"):
+                coerced.append(dict(getattr(frag, "__dict__")))
+            elif isinstance(frag, dict):
+                coerced.append(frag)
+            else:
+                coerced.append({"value": frag})
+        records = coerced
     
     # Delegate to schema generator
-    schema_metadata = generate_schema(records, source_id)
-    
-    # Convert SchemaMetadata to dict for flexible return type
-    return schema_metadata.model_dump()
+    return generate_schema(records, source_id)
 
 
 def get_current_schema(source_id: str) -> SchemaMetadata:
     """Return the latest schema for a source."""
 
-    raise NotImplementedError
+    db = _get_db_for_source(source_id)
+    schema = schema_store.retrieve_schema(db, source_id)
+    if schema is None:
+        raise SchemaInferenceError(f"No schema found for source '{source_id}'")
+    return schema
 
 
 def get_schema_history(source_id: str) -> GetSchemaHistoryResponse:
     """Return all schema versions plus diffs."""
 
-    raise NotImplementedError
+    db = _get_db_for_source(source_id)
+    schemas = schema_store.get_schema_history(db, source_id)
+    diffs = []
+    if len(schemas) > 1:
+        for previous, current in zip(schemas, schemas[1:]):
+            diffs.append(migration.detect_schema_change(previous, current))
+    return GetSchemaHistoryResponse(schemas=schemas, diffs=diffs)
 
 
 def handle_schema_evolution(
@@ -105,4 +131,17 @@ def handle_schema_evolution(
 ) -> bool:
     """Apply schema evolution procedures when needed."""
 
-    raise NotImplementedError
+    if old_schema is None or new_schema is None:
+        return False
+
+    diff = migration.detect_schema_change(old_schema, new_schema)
+    if not diff.added_fields and not diff.removed_fields and not diff.type_changes:
+        LOGGER.info("No schema evolution required for source '%s'", source_id)
+        return False
+
+    db_name, collection_name = service_orchestrator.get_db_and_collection(source_id)
+    db = MongoConnection.get_instance().get_database(db_name)
+    success = migration.evolve_collection_schema(db, collection_name, old_schema, new_schema)
+    if not success:
+        raise StorageError(f"Failed to evolve schema for source '{source_id}'")
+    return True
