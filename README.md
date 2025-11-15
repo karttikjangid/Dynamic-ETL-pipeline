@@ -75,14 +75,20 @@ MongoDB storage + query services
 	pip install -r requirements.txt
 	```
 
-3. Configure environment variables:
+3. Download spaCy language model:
+
+	```bash
+	python -m spacy download en_core_web_sm
+	```
+
+4. Configure environment variables:
 
 	```bash
 	cp .env.example .env
 	# update Mongo URI, database names, logging level, etc.
 	```
 
-4. Launch the API with auto-reload for local development:
+5. Launch the API with auto-reload for local development:
 
 	```bash
 	uvicorn main:main --reload

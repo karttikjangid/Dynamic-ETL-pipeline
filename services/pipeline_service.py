@@ -18,6 +18,7 @@ from extractors.orchestrator import extract_all_records
 from normalizers.orchestrator import normalize_all_records
 from services import orchestrator as service_orchestrator
 from services import schema_service
+from services.ner_service import apply_ner_to_fragments
 from storage import collection_manager, document_inserter, schema_store
 from storage.connection import MongoConnection
 from utils.logger import get_logger
@@ -26,8 +27,14 @@ from utils.logger import get_logger
 LOGGER = get_logger(__name__)
 
 
-def process_upload(file_path: str, source_id: str) -> UploadResponse:
-    """Process a newly uploaded file and return upload metadata."""
+def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> UploadResponse:
+    """Process a newly uploaded file and return upload metadata.
+    
+    Args:
+        file_path: Path to the file to process
+        source_id: Identifier for the data source
+        enable_ner: Whether to apply Named Entity Recognition (default: True)
+    """
 
     resolved_path = Path(file_path).expanduser().resolve()
     if not resolved_path.is_file():
@@ -68,7 +75,16 @@ def process_upload(file_path: str, source_id: str) -> UploadResponse:
     if not normalized_records:
         raise NormalizationError("No records produced after normalization")
 
+    # Apply NER if enabled (after normalization, before storage)
     normalized_docs = _serialize_normalized_records(normalized_records)
+    if enable_ner:
+        try:
+            normalized_docs = apply_ner_to_fragments(normalized_docs)
+            LOGGER.info("NER applied to %d fragments for source '%s'", len(normalized_docs), source_id)
+        except Exception as exc:
+            # Log NER failure but don't block the pipeline
+            LOGGER.warning("NER processing failed for source '%s': %s", source_id, exc)
+    
     records_normalized = len(normalized_docs)
 
     if records_normalized == 0:
