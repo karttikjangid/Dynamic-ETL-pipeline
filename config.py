@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     """Runtime configuration sourced from environment variables."""
 
     mongodb_uri: str = Field(default_factory=_load_mongo_uri_from_env)
+    mongodb_database: str = "etl_db"  # Single fixed database for entire ETL pipeline
     database_prefix: str = "etl_"
     environment: str = "development"
     api_host: str = "0.0.0.0"
