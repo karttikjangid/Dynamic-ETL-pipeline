@@ -42,10 +42,15 @@ class MongoConnection:
             return self.connect()
         return self._client
 
-    def get_database(self, name: str):
-        """Return a database reference from the Mongo client."""
-
+    def get_database(self, name: str = None):
+        """Return a database reference from the Mongo client.
+        
+        Args:
+            name: Database name. If None, uses the default database from settings.
+        """
         client = self.get_client()
+        if name is None:
+            name = self._settings.mongodb_database
         return client[name]
 
     @staticmethod

@@ -23,10 +23,14 @@ def _slugify_source(source_id: str) -> str:
 
 
 def get_db_and_collection(source_id: str) -> Tuple[str, str]:
-    """Return database and collection names for a source."""
-
+    """Return database and collection names for a source.
+    
+    NOTE: Now returns a single fixed database name for all sources.
+    Collections are named based on source_id to maintain separation.
+    """
     slug = _slugify_source(source_id)
-    db_name = f"{SETTINGS.database_prefix}{slug}"
+    # FIX: Use single database for entire ETL pipeline
+    db_name = SETTINGS.mongodb_database
     collection_name = f"{slug}_{_COLLECTION_SUFFIX}"
     return db_name, collection_name
 
