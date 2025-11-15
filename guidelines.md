@@ -506,3 +506,4 @@ All handlers are defined in `handlers.py`.
 All common helpers (logging, file handling, validators, flattening).
 
 ---
+Testing will not be done yet as we are only focusing on building it 
