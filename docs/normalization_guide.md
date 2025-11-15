@@ -12,10 +12,11 @@
 1. [Overview](#overview)
 2. [Architecture](#architecture)
 3. [KV Normalizer](#kv-normalizer)
-4. [Type Inference](#type-inference)
-5. [Key Standardization](#key-standardization)
-6. [Usage Examples](#usage-examples)
-7. [Best Practices](#best-practices)
+4. [JSON Normalizer](#json-normalizer)
+5. [Type Inference](#type-inference)
+6. [Key Standardization](#key-standardization)
+7. [Usage Examples](#usage-examples)
+8. [Best Practices](#best-practices)
 
 ---
 
@@ -113,6 +114,218 @@ def normalize(self, records: List[Dict]) -> List[NormalizedRecord]:
     )
 ]
 ```
+
+---
+
+## JSON Normalizer
+
+### Purpose
+
+Normalizes JSON objects by recursively applying type inference to string values while preserving the exact JSON structure.
+
+### Class: `JSONNormalizer`
+
+**Location**: `normalizers/json_normalizer.py`
+
+#### Method: `normalize()`
+
+```python
+def normalize(self, records: List[Dict]) -> List[NormalizedRecord]:
+    """
+    Normalize list of JSON records into NormalizedRecord objects.
+    
+    Args:
+        records: List of dicts with 'data', 'source_type', 'confidence' keys
+        
+    Returns:
+        List of NormalizedRecord objects with normalized data
+    """
+```
+
+**Input Format**:
+```python
+[
+    {
+        "data": {
+            "product_id": "P-123",
+            "price": "299.99",
+            "available": "true",
+            "specs": {
+                "weight": "45"
+            }
+        },
+        "source_type": "json",
+        "confidence": 1.0
+    }
+]
+```
+
+**Output Format**:
+```python
+[
+    NormalizedRecord(
+        data={
+            "product_id": "P-123",
+            "price": 299.99,
+            "available": True,
+            "specs": {
+                "weight": 45
+            }
+        },
+        original_source="json",
+        extraction_confidence=1.0
+    )
+]
+```
+
+### Key Differences from KV Normalizer
+
+| Feature | JSON Normalizer | KV Normalizer |
+|---------|----------------|---------------|
+| **Key Standardization** | ❌ Not applied (preserves original keys) | ✅ Applied (converts to snake_case) |
+| **Type Inference** | ✅ Applied to string values | ✅ Applied to all values |
+| **Shape Preservation** | ✅ Exact structure preserved | ✅ Flat structure maintained |
+| **Already-typed values** | ✅ Kept as-is (int, bool, etc.) | N/A (all KV values are strings) |
+
+### Function: `normalize_json_record()`
+
+```python
+def normalize_json_record(record: Dict) -> Optional[Dict]:
+    """
+    Normalize a single JSON record.
+    
+    Recursively processes the JSON structure, applying type inference
+    to string values while preserving the overall shape.
+    """
+```
+
+### Function: `clean_json_values()`
+
+```python
+def clean_json_values(value: Any) -> Any:
+    """
+    Recursively normalize JSON values.
+    
+    Handles:
+    - Dicts: recurse on all values
+    - Lists: recurse on all elements
+    - Strings: apply type inference
+    - Booleans: keep as-is
+    - Numbers: keep as-is
+    - None: keep as-is
+    """
+```
+
+### Examples
+
+#### Example 1: Simple JSON Object
+
+**Input**:
+```python
+{
+    "name": "Product",
+    "price": "99.99",
+    "quantity": "10",
+    "available": "true"
+}
+```
+
+**Output**:
+```python
+{
+    "name": "Product",
+    "price": 99.99,
+    "quantity": 10,
+    "available": True
+}
+```
+
+#### Example 2: Nested JSON Structure
+
+**Input**:
+```python
+{
+    "product": {
+        "id": "P-123",
+        "details": {
+            "price": "149.99",
+            "stock": "25"
+        }
+    }
+}
+```
+
+**Output**:
+```python
+{
+    "product": {
+        "id": "P-123",
+        "details": {
+            "price": 149.99,
+            "stock": 25
+        }
+    }
+}
+```
+
+Note: Structure is **exactly preserved** - same keys, same nesting.
+
+#### Example 3: Arrays in JSON
+
+**Input**:
+```python
+{
+    "items": [
+        {"id": "1", "price": "10.99"},
+        {"id": "2", "price": "20.99"}
+    ],
+    "counts": ["10", "20", "30"]
+}
+```
+
+**Output**:
+```python
+{
+    "items": [
+        {"id": 1, "price": 10.99},
+        {"id": 2, "price": 20.99}
+    ],
+    "counts": [10, 20, 30]
+}
+```
+
+#### Example 4: Mixed Already-Typed Values
+
+**Input**:
+```python
+{
+    "id": 12345,           # Already int
+    "name": "Test",        # Already string
+    "active": True,        # Already bool
+    "price": "99.99",      # String → will convert
+    "count": "50"          # String → will convert
+}
+```
+
+**Output**:
+```python
+{
+    "id": 12345,           # Preserved
+    "name": "Test",        # Preserved
+    "active": True,        # Preserved
+    "price": 99.99,        # Converted
+    "count": 50            # Converted
+}
+```
+
+### Shape Preservation Guarantee
+
+The JSON normalizer **guarantees** that:
+1. All keys remain in the same order
+2. Nested structures maintain exact depth
+3. Arrays maintain exact length and order
+4. Only string values undergo type inference
+5. Already-typed values (int, float, bool, None) are untouched
 
 ---
 
