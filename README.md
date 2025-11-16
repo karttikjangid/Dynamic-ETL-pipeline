@@ -30,6 +30,8 @@ MongoDB storage (nested/complex data) + SQLite storage (tabular data)
 	↓ FastAPI routes for upload/schema/query/records/health
 ```
 
+> **📖 For detailed workflow information including all custom class objects, data transformations, and technical specifications, see [`docs/workflow.md`](docs/workflow.md).**
+
 ## Module Boundaries & Allowed Dependencies
 
 | Module | Responsibility | Can depend on |
@@ -51,10 +53,10 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
 
 ### Storage Backends
 
-| Backend | Purpose | Data Types | Schema Handling | Versioning |
-|---------|---------|------------|-----------------|------------|
-| **MongoDB** | Complex/nested data | `json`, `yaml_block` | JSON Schema validation | Schema-level versioning |
-| **SQLite** | Tabular/structured data | `html_table`, `csv_block`, `kv` | Relational tables | Table-level versioning |
+| Backend | Purpose | Data Types | Schema Handling | Versioning | Location |
+|---------|---------|------------|-----------------|------------|----------|
+| **MongoDB** | Complex/nested data | `json`, `yaml_block` | JSON Schema validation | Schema-level versioning | Collections: `{source_id}_records` |
+| **SQLite** | Tabular/structured data | `html_table`, `csv_block`, `kv` | Relational tables | Table-level versioning | Tables: `{source_id}_v{version}` |
 
 ### Data Routing Criteria
 
@@ -66,6 +68,34 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
    - Flat schemas (no `object`/`array` types) → SQLite compatible
    - Complex schemas → MongoDB required
 
+### Storage Implementation Details
+
+#### MongoDB Collections
+- **Naming**: `{source_id}_records` (e.g., `user_data_records`)
+- **Validation**: JSON Schema with `bsonType` constraints
+- **Indexing**: Automatic indexes on all schema fields
+- **Data**: Native BSON documents preserving full structure
+
+#### SQLite Tables
+- **Naming**: `{source_id}_v{version}` (e.g., `user_data_v1`)
+- **Structure**: Dynamic table creation with typed columns
+- **Flattening**: Nested objects flattened with underscore separators
+- **Location**: `./data/sqlite/etl_pipeline.db`
+
+### Schema Compatibility Determination
+```python
+def get_compatible_dbs_for_schema(schema: SchemaMetadata) -> List[str]:
+    # Check if schema is "flat" enough for SQLite
+    is_flat = all(field.type not in ["object", "array"] for field in schema.fields)
+    
+    compatible = []
+    if is_flat:
+        compatible.append("sqlite")  # Can use relational storage
+    compatible.append("mongodb")     # MongoDB can handle anything
+    
+    return compatible
+```
+
 ### Versioning Mechanism
 
 **Schema signatures** determine version changes, not upload frequency:
@@ -75,12 +105,53 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
 - **Duplicate Detection**: Identical signatures reuse existing versions
 - **Change Triggers**: Field additions/removals, type changes, nullability shifts
 
-### Storage Locations
+```python
+# Version increment logic
+target_version = 1
+duplicate_upload = False
+if existing_schema is not None:
+    duplicate_upload = handle_duplicate_upload(source_id, new_schema, existing_schema)
+    target_version = existing_schema.version if duplicate_upload else existing_schema.version + 1
+```
 
-- **MongoDB**: Collections named `{source_id}_records`
-- **SQLite**: Single database file `./data/sqlite/etl_pipeline.db` with versioned tables `{source_id}_v{version}`
+## Design Decisions & Workflow
 
-## Repository Map
+### Why Hybrid Storage?
+- **Performance Optimization**: Tabular data performs better in relational databases (SQLite) with structured queries and aggregations
+- **Flexibility**: Complex nested data requires document storage (MongoDB) to preserve structure
+- **Automatic Routing**: Source type + data structure analysis ensures optimal backend selection
+- **Cost Efficiency**: Single SQLite file vs MongoDB deployment complexity
+
+### Why Intelligent Versioning?
+- **Deterministic Evolution**: Versions only increment on actual schema changes, not uploads
+- **Storage Efficiency**: Identical schemas reuse versions, preventing redundant storage
+- **Backward Compatibility**: Signature-based comparison handles schema evolution gracefully
+- **Audit Trail**: Version history tracks meaningful structural changes over time
+
+### Why Dual Schema Generation?
+The pipeline uses **both custom inference AND Genson** for complementary purposes:
+
+#### Custom Inference (Primary)
+- **Purpose**: Fast, ETL-optimized schema for pipeline operations
+- **Output**: `SchemaField[]` with confidence scores, examples, metadata
+- **Performance**: Lightweight, custom logic for ETL edge cases
+- **Use Case**: Core pipeline operations, validation, storage
+
+#### Genson Schema (Secondary)
+- **Purpose**: Advanced schema comparison for versioning
+- **Output**: Standard JSON Schema format
+- **Features**: Structural signatures, deep diffing capabilities
+- **Use Case**: Duplicate detection, schema evolution tracking
+
+### Workflow Philosophy
+1. **Extract First**: Parse raw files into structured fragments
+2. **Normalize Second**: Standardize data formats and types
+3. **Compare Third**: Check for structural changes before versioning
+4. **Infer Fourth**: Generate schemas from actual data patterns
+5. **Route Fifth**: Choose optimal storage backend
+6. **Store Sixth**: Persist with schema validation and indexing
+
+This approach ensures **data integrity**, **performance optimization**, and **deterministic behavior** while handling diverse data sources.
 
 - `config.py` – settings bootstrap (dotenv + Pydantic).
 - `main.py` – FastAPI application factory entry point.
@@ -144,18 +215,54 @@ Lightweight smoke suites live under `tests/`. Run them with:
 pytest
 ```
 
-## Working with the Pipeline
+## Schema Generation & Versioning
 
-1. **Upload** a `.txt`/`.md` file via `/upload`. The handler streams the file through the extractor orchestrator, returning `UploadResponse` with `parsed_fragments_summary = {"json_fragments": X, "kv_pairs": Y}` and extracted counts.
-2. **Normalization** is type-aware: JSON fragments pass through `JSONNormalizer`, KV fragments through `KVNormalizer`, each producing `NormalizedRecord` instances with source provenance and extraction confidence.
-3. **Schema Generation** leverages pandas + PyArrow to infer field types, map them via `inference/type_mapper.py`, compute confidence scores, and persist the resulting `SchemaMetadata` and diffs.
-4. **Duplicate Detection** compares schema signatures (Genson-based or field-based) to determine if content is identical; matching signatures reuse existing schema versions.
-5. **Hybrid Storage Routing** automatically categorizes data by source type and structure:
-   - Complex/nested data (`json`, `yaml_block`) → MongoDB collections
-   - Tabular data (`html_table`, `csv_block`, `kv`) → SQLite tables
-6. **Storage & Querying** rely on backend-specific schema validation. Strict query payloads (dict form) are required for `/query`; results are fetched via `/records` with pagination-capable limits.
+The pipeline employs a **dual-schema architecture** for optimal performance and intelligent versioning:
 
-Re-uploading identical content is idempotent: schema versions are reused, and migration helpers in `storage/migration.py` only trigger when `SchemaDiff` detects real structural changes.
+### Primary Schema System (Custom Inference)
+**Purpose:** Fast, ETL-optimized schema generation for pipeline operations
+
+```python
+# Core type detection
+field_types = detect_data_types(records)  # Maps field → type
+schema_fields = build_schema_fields(records, field_types, field_confidences)
+```
+
+**Features:**
+- **Simple type system**: `string`, `integer`, `number`, `boolean`, `object`, `array`, `null`
+- **Rich metadata**: Confidence scores, nullability detection, example values
+- **Performance**: Lightweight inference using `infer_type()` + `merge_types()`
+- **Control**: Custom logic handles ETL-specific edge cases
+
+### Secondary Schema System (Genson)
+**Purpose:** Advanced schema comparison for intelligent versioning
+
+```python
+# Signature generation for versioning
+genson_schema = generate_genson_schema(records)  # JSON Schema format
+signature = compute_schema_signature(genson_schema)  # Hash for comparison
+```
+
+**Features:**
+- **Standard JSON Schema**: Full JSON Schema specification compliance
+- **Structural signatures**: Deterministic hashing for duplicate detection
+- **Deep comparison**: Enables sophisticated schema evolution tracking
+- **Interoperability**: Standard format for external tools
+
+### Versioning Logic
+**Schema versions increment only on structural changes:**
+
+1. **Signature Comparison**: Genson-based structural hashing
+2. **Duplicate Detection**: Identical signatures reuse existing versions
+3. **Change Triggers**: Field additions/removals, type changes, nullability shifts
+4. **Fallback**: Field-based tuple comparison for backward compatibility
+
+```python
+# Version increment logic
+if existing_schema:
+    duplicate = handle_duplicate_upload(source_id, new_schema, existing_schema)
+    target_version = existing_schema.version if duplicate else existing_schema.version + 1
+```
 
 ## Design Decisions & Workflow
 
