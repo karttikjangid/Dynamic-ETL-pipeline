@@ -33,7 +33,7 @@ POST /upload
 **Content-Type**: `multipart/form-data`
 
 **Form Fields**:
-- `file` (required): The file to upload (`.txt` or `.md` extensions only)
+- `file` (required): The file to upload (`.txt` or `.md` extensions) containing any combination of JSON, key-value pairs, HTML tables, CSV blocks, YAML fragments, or Markdown code blocks
 - `source_id` (optional): Custom identifier for the data source. If not provided, auto-generated from filename
 - `version` (optional): Force a specific schema version (positive integer)
 
@@ -607,7 +607,7 @@ curl "http://localhost:8000/health"
 {
   "status": "healthy",
   "timestamp": "2025-11-16T12:00:00Z",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "services": {
     "mongodb": {
       "status": "connected",
@@ -626,7 +626,7 @@ curl "http://localhost:8000/health"
 {
   "status": "degraded",
   "timestamp": "2025-11-16T12:00:00Z",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "services": {
     "mongodb": {
       "status": "error",
@@ -647,7 +647,7 @@ curl "http://localhost:8000/health"
 {
   "status": "unhealthy",
   "timestamp": "2025-11-16T12:00:00Z",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "services": {
     "mongodb": {
       "status": "error",

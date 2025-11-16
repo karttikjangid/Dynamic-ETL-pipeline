@@ -19,7 +19,7 @@ from .validators import validate_query_payload, validate_upload_payload
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
-    app = FastAPI(title="Dynamic ETL Pipeline", version="0.1.0")
+    app = FastAPI(title="Dynamic ETL Pipeline", version="1.0.0")
     register_middleware(app)
     app.include_router(_build_router())
     return app
