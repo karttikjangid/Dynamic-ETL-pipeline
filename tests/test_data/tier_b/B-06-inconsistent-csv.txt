@@ -1,0 +1,11 @@
+id,name,notes
+1,"Alice, CEO","\"Quoted\" value"
+2,"Bob","Missing end quote
+3,Charlie,"Proper"
+
+summary: inconsistent csv quoting
+tier: B-06
+
+{
+  "csv_hint": "inconsistent_quotes"
+}

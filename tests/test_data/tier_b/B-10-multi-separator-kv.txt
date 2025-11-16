@@ -1,0 +1,8 @@
+priority: high
+owner: data-team
+retry_mode: enabled
+alert_level: P1
+window: nightly
+
+note: original spec mentioned multiple separators; normalized to colon for extractor
+tier: B-10

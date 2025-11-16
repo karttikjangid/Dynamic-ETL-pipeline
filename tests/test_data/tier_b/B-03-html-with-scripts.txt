@@ -1,0 +1,22 @@
+<!-- Comment block to ensure parser ignores noise -->
+<div class="profile">
+  <p>Customer profile snippet rendered via static HTML.</p>
+</div>
+
+<script>
+  // Example script that should never execute
+  var injected = {"should": "not execute"};
+  console.log(injected);
+</script>
+
+{
+  "customer_id": "B03-100",
+  "status": "active",
+  "tier": "B-03",
+  "metadata": {
+    "source": "inline-script",
+    "notes": ["treat as code", "never run"]
+  }
+}
+
+page_section: script-heavy

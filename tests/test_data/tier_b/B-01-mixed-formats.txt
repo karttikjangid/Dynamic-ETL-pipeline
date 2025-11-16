@@ -1,0 +1,83 @@
+# Tier B-01 – Mixed Formats Fixture
+# Contains JSON fragments, an HTML table, and CSV rows per TEST_PLAN_TIERED.
+
+{
+  "record_id": "mix-001",
+  "region": "NA",
+  "risk_score": 0.87,
+  "source_channel": "ops-dashboard",
+  "alert_level": "high",
+  "format_version": 1,
+  "compliance": {
+    "owner": {
+      "primary": "controls-team",
+      "backup": "site-reliability"
+    },
+    "checks": [
+      {"id": "chk-001", "status": "pass", "evidence": {"sample_size": 12}},
+      {"id": "chk-002", "status": "review", "notes": ["needs-follow-up", "attach-logs"]}
+    ]
+  }
+}
+
+Some analyst notes live between fragments to ensure the parser skips prose.
+
+<table>
+  <thead>
+    <tr>
+      <th>account_id</th>
+      <th>status</th>
+      <th>balance</th>
+      <th>region</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>acct-1001</td>
+      <td>active</td>
+      <td>1250.50</td>
+      <td>NA</td>
+    </tr>
+    <tr>
+      <td>acct-1002</td>
+      <td>inactive</td>
+      <td>480.00</td>
+      <td>EU</td>
+    </tr>
+    <tr>
+      <td>acct-1003</td>
+      <td>active</td>
+      <td>9050.75</td>
+      <td>APAC</td>
+    </tr>
+  </tbody>
+</table>
+
+inventory_id,sku,quantity,price,warehouse,status
+north-01,SNK-001,10,59.99,denver,active
+north-01,SNK-002,5,120.00,denver,maintenance
+apac-02,SNK-010,12,89.50,singapore,active
+
+{
+  "record_id": "mix-002",
+  "region": "APAC",
+  "risk_score": 0.44,
+  "source_channel": "partner-feed",
+  "alert_level": "medium",
+  "format_version": 1,
+  "recent_activity": [
+    {
+      "type": "case_opened",
+      "timestamp": "2024-09-01T10:15:00Z",
+      "actors": ["svc-bot", "analyst-5"]
+    },
+    {
+      "type": "case_closed",
+      "timestamp": "2024-09-02T09:45:00Z",
+      "resolution": {
+        "status": "no-issue",
+        "notes": "False positive caused by duplicate feed"
+      }
+    }
+  ]
+}

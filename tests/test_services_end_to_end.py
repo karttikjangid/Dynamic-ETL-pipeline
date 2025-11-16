@@ -41,7 +41,15 @@ def test_process_upload_and_query_roundtrip(tmp_path):
         "device_type",
     }.issubset(field_names)
 
-    status_query = query_service.execute_query(source_id, {"filter": {"status": "completed"}})
+    status_query = query_service.execute_query(
+        source_id,
+        {
+            "engine": "sqlite",
+            "select": ["transaction_id", "status", "amount"],
+            "where": {"status": "completed"},
+            "limit": 10,
+        },
+    )
     assert status_query.result_count >= 1
     assert status_query.results[0]["status"] == "completed"
 
@@ -75,7 +83,14 @@ def test_markdown_upload_with_code_blocks_and_html(tmp_path):
     assert json_block_query.result_count == 1
     assert json_block_query.results[0]["username"] == "code_block_user"
 
-    kv_query = query_service.execute_query(source_id, {"filter": {"actual_field": "actual_value"}})
+    kv_query = query_service.execute_query(
+        source_id,
+        {
+            "engine": "sqlite",
+            "select": ["actual_field", "real_data"],
+            "where": {"actual_field": "actual_value"},
+        },
+    )
     assert kv_query.result_count == 1
     assert kv_query.results[0]["real_data"] == "this is real"
 
@@ -177,3 +192,41 @@ def test_sqlite_engine_query_execution(tmp_path):
 
     assert sla_query.result_count == 2
     assert {row["ticket_tier"] for row in sla_query.results} == {"tier-b"}
+
+
+@pytest.mark.integration
+def test_mixed_tier_b_fixture_supports_dual_storage(tmp_path):
+    """Ensure Tier B mixed-format uploads still materialize SQLite tables."""
+
+    source_id = "tier-b-mixed"
+    repo_root = Path(__file__).resolve().parents[1]
+    fixture_path = repo_root / "test_data" / "tier_b" / "B-01-mixed-formats.txt"
+
+    if not fixture_path.is_file():
+        pytest.skip("Tier B mixed-format fixture missing; skipping test.")
+
+    sample_file = tmp_path / "b01_mixed.txt"
+    sample_file.write_text(fixture_path.read_text())
+
+    response = process_upload(str(sample_file), source_id)
+
+    assert response.status == "success"
+    storage_evidence = response.evidence.get("storage", {})
+    assert storage_evidence.get("sqlite_inserted", 0) >= 1
+    assert storage_evidence.get("mongodb_inserted", 0) >= 1
+
+    schema = schema_service.get_current_schema(source_id)
+    assert {"sqlite", "mongodb"}.issubset(schema.compatible_dbs)
+
+    sqlite_query = query_service.execute_query(
+        source_id,
+        {
+            "engine": "sqlite",
+            "select": ["account_id", "status", "balance", "region"],
+            "where": {"status": "active"},
+            "limit": 5,
+        },
+    )
+
+    assert sqlite_query.result_count >= 1
+    assert all(row["status"] == "active" for row in sqlite_query.results)

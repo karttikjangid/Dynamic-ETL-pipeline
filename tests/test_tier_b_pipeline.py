@@ -2,31 +2,38 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from pathlib import Path
 
 import pytest
 
 from services.pipeline_service import process_upload
 from services import query_service, schema_service
-from tests.payloads import TEST_PAYLOADS
 
 
-def _write_payload(tmp_path, content: str, suffix: str = ".txt") -> str:
-    file_path = tmp_path / f"tier_b_{uuid4().hex}{suffix}"
-    file_path.write_text(content)
-    return str(file_path)
+FIXTURE_DIR = Path(__file__).resolve().parents[1] / "test_data" / "tier_b"
+
+
+def _fixture_path(filename: str) -> str:
+    """Return an absolute path to a Tier-B fixture file."""
+
+    path = FIXTURE_DIR / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Tier-B fixture not found: {path}")
+    return str(path)
 
 
 @pytest.mark.integration
-def test_tier_b01_mixed_formats(tmp_path):
+def test_tier_b01_mixed_formats():
     source_id = "tier-b-01"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_01_mixed_formats"])
+    file_path = _fixture_path("B-01-mixed-formats.txt")
 
     response = process_upload(file_path, source_id)
 
     assert response.status == "success"
     assert response.parsed_fragments_summary["json_fragments"] >= 1
-    assert response.records_extracted >= 2
+    assert response.parsed_fragments_summary["html_tables"] >= 1
+    assert response.parsed_fragments_summary["csv_blocks"] >= 1
+    assert response.records_extracted >= 3
 
     schema = schema_service.get_current_schema(source_id)
     field_names = {field.name for field in schema.fields}
@@ -34,13 +41,9 @@ def test_tier_b01_mixed_formats(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b02_frontmatter_inline_html(tmp_path):
+def test_tier_b02_frontmatter_inline_html():
     source_id = "tier-b-02"
-    file_path = _write_payload(
-        tmp_path,
-        TEST_PAYLOADS["tier_b_02_frontmatter_inline_html"],
-        suffix=".md",
-    )
+    file_path = _fixture_path("B-02-frontmatter-inline-html.md")
 
     response = process_upload(file_path, source_id)
 
@@ -53,9 +56,9 @@ def test_tier_b02_frontmatter_inline_html(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b03_html_with_scripts(tmp_path):
+def test_tier_b03_html_with_scripts():
     source_id = "tier-b-03"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_03_html_with_scripts"])
+    file_path = _fixture_path("B-03-html-with-scripts.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -68,9 +71,9 @@ def test_tier_b03_html_with_scripts(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b04_multiple_json_fragments(tmp_path):
+def test_tier_b04_multiple_json_fragments():
     source_id = "tier-b-04"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_04_multiple_json_fragments"])
+    file_path = _fixture_path("B-04-mixed-json.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -85,9 +88,9 @@ def test_tier_b04_multiple_json_fragments(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b05_inline_sql_is_treated_as_text(tmp_path):
+def test_tier_b05_inline_sql_is_treated_as_text():
     source_id = "tier-b-05"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_05_inline_sql"])
+    file_path = _fixture_path("B-05-inline-sql.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -99,9 +102,9 @@ def test_tier_b05_inline_sql_is_treated_as_text(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b06_csv_inconsistent_quotes(tmp_path):
+def test_tier_b06_csv_inconsistent_quotes():
     source_id = "tier-b-06"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_06_csv_inconsistent_quotes"])
+    file_path = _fixture_path("B-06-inconsistent-csv.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -114,9 +117,9 @@ def test_tier_b06_csv_inconsistent_quotes(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b07_mixed_delimiter_block(tmp_path):
+def test_tier_b07_mixed_delimiter_block():
     source_id = "tier-b-07"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_07_mixed_delimiter_block"])
+    file_path = _fixture_path("B-07-mixed-delimiters.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -128,13 +131,9 @@ def test_tier_b07_mixed_delimiter_block(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b08_markdown_nested_lists(tmp_path):
+def test_tier_b08_markdown_nested_lists():
     source_id = "tier-b-08"
-    file_path = _write_payload(
-        tmp_path,
-        TEST_PAYLOADS["tier_b_08_markdown_nested_lists"],
-        suffix=".md",
-    )
+    file_path = _fixture_path("B-08-markdown-nested-lists.md")
 
     response = process_upload(file_path, source_id)
 
@@ -147,9 +146,9 @@ def test_tier_b08_markdown_nested_lists(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b09_timezone_date_mix(tmp_path):
+def test_tier_b09_timezone_date_mix():
     source_id = "tier-b-09"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_09_timezone_date_mix"])
+    file_path = _fixture_path("B-09-timezone-dates.txt")
 
     response = process_upload(file_path, source_id)
 
@@ -162,9 +161,9 @@ def test_tier_b09_timezone_date_mix(tmp_path):
 
 
 @pytest.mark.integration
-def test_tier_b10_multi_separator_kv(tmp_path):
+def test_tier_b10_multi_separator_kv():
     source_id = "tier-b-10"
-    file_path = _write_payload(tmp_path, TEST_PAYLOADS["tier_b_10_multi_separator_kv"])
+    file_path = _fixture_path("B-10-multi-separator-kv.txt")
 
     response = process_upload(file_path, source_id)
 

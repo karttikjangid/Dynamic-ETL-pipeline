@@ -1,0 +1,18 @@
+{
+  "record": 1,
+  "status": "ok"
+}
+
+{
+  "record": 2,
+  "status": "ok"
+}
+
+{
+  "record": 3,
+  "status": "oops",
+  "detail": "trailing comma",
+}
+
+meta: includes malformed fragment
+tier: B-04

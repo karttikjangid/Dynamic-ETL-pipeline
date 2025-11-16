@@ -1,0 +1,13 @@
+```sql
+CREATE TABLE nightly_rollup (
+  id INT PRIMARY KEY,
+  total DECIMAL(10,2)
+);
+
+DROP TABLE IF EXISTS legacy_data;
+```
+
+system: analytics
+environment: staging
+owner: etl
+tier: B-05

@@ -1,0 +1,79 @@
+# Tier-B mixed ingestion fixture (version 2)
+# Adds additional compliance fields to trigger schema evolution.
+
+{
+  "record_id": "mix-001",
+  "region": "NA",
+  "risk_score": 0.91,
+  "source_channel": "ops-dashboard",
+  "alert_level": "high",
+  "format_version": 2,
+  "compliance_flag": true,
+  "playbook_step": "escalate",
+  "workflow": {
+    "steps": [
+      {"name": "triage", "owner": "level-1", "sla_minutes": 30},
+      {"name": "deep-dive", "owner": "level-2", "sla_minutes": 120}
+    ],
+    "approvals": {
+      "primary": "director-risk",
+      "backup": ["vp-ops", "svp-risk"]
+    }
+  }
+}
+
+Operational chatter between fragments reminds reviewers where changes came from.
+
+<table>
+  <thead>
+    <tr>
+      <th>account_id</th>
+      <th>status</th>
+      <th>balance</th>
+      <th>region</th>
+      <th>risk_label</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>acct-1001</td>
+      <td>active</td>
+      <td>1250.50</td>
+      <td>NA</td>
+      <td>moderate</td>
+    </tr>
+    <tr>
+      <td>acct-1004</td>
+      <td>active</td>
+      <td>13250.00</td>
+      <td>APAC</td>
+      <td>critical</td>
+    </tr>
+  </tbody>
+</table>
+
+inventory_id,sku,quantity,price,warehouse,status,currency
+north-01,SNK-001,10,59.99,denver,active,USD
+north-01,SNK-002,5,120.00,denver,maintenance,USD
+emea-03,SNK-020,8,210.00,dublin,active,EUR
+
+{
+  "record_id": "mix-003",
+  "region": "EU",
+  "risk_score": 0.62,
+  "source_channel": "partner-feed",
+  "alert_level": "medium",
+  "format_version": 2,
+  "compliance_flag": false,
+  "playbook_step": "monitor",
+  "escalations": [
+    {
+      "id": "esc-200",
+      "status": "pending",
+      "contacts": {
+        "primary": "regional-director",
+        "alternates": ["security-lead", "finance-controller"]
+      }
+    }
+  ]
+}
