@@ -360,9 +360,11 @@ curl "http://localhost:8000/records?source_id=demo_notes&query_id=<id>&limit=50"
 
 ## Documentation & References
 
+- [`docs/api_reference.md`](docs/api_reference.md) – comprehensive API documentation with request/response examples and validation rules.
 - `guidelines.md` – authoritative architecture, dependency rules, and scope.
 - `docs/EXTRACTOR_*`, `docs/NORMALIZER_*`, `docs/ORCHESTRATOR_IMPLEMENTATION.md` – module-specific implementation notes.
 - `docs/COMPUTE_SCHEMA_DIFF.md`, `docs/VISUAL_OUTPUT_GUIDE.md` – schema evolution and visualization references.
+- `docs/workflow.md` – detailed workflow information including all custom class objects, data transformations, and technical specifications.
 - `storage/` – hybrid storage implementation details (MongoDB + SQLite routing, versioning strategies).
 - `inference/genson_integration.py` – advanced schema signature computation for versioning.
 
