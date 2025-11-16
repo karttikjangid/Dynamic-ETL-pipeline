@@ -69,23 +69,36 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
 
 ## Schema Compatibility Determination
 
+The pipeline now infers **two schemas per upload**:
+
+1. A **primary schema** built from *all* normalized fragments (used for MongoDB storage, schema history, and versioning).
+2. A **tabular schema** built strictly from fragments routed to SQLite (`html_table`, `csv_block`, `kv`).
+
+This decoupling means nested JSON/YAML no longer prevents tabular data from landing in SQLite. Compatibility is derived from both schemas:
+
 ```python
-def get_compatible_dbs_for_schema(schema: SchemaMetadata) -> List[str]:
+def get_compatible_dbs_for_schema(
+    schema: SchemaMetadata,
+    sqlite_schema: Optional[SchemaMetadata] = None
+) -> List[str]:
     """Determine which databases are compatible with a schema."""
 
-    # Check if schema is flat enough for SQLite
-    is_flat = all(
-        field.type not in ["object", "array"]
-        for field in schema.fields
-    )
+    compatible: List[str] = []
 
-    compatible = []
-    if is_flat:
-        compatible.append("sqlite")  # Can use relational storage
-    compatible.append("mongodb")     # MongoDB can handle anything
+    def _is_flat(target: SchemaMetadata) -> bool:
+        return all(field.type not in ["object", "array"] for field in target.fields)
 
+    if schema and _is_flat(schema):
+        compatible.append("sqlite")                   # Global schema is flat
+
+    if "sqlite" not in compatible and sqlite_schema and _is_flat(sqlite_schema):
+        compatible.append("sqlite")                   # Tabular subset is flat
+
+    compatible.append("mongodb")                      # Always supported
     return compatible
 ```
+
+When a tabular schema exists, SQLite inserts proceed even if the global schema contains nested fields. Only the tabular schema is used for `CREATE TABLE` statements, while the primary schema continues to drive MongoDB collection creation and schema history.
 
 ## Versioning Mechanism
 

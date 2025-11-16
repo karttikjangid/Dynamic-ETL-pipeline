@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Dict, List
 
 from core import NormalizedRecord
+from utils.serialization import coerce_to_json_serializable
 
 from .json_normalizer import JSONNormalizer
 from .kv_normalizer import KVNormalizer
@@ -108,8 +109,9 @@ def normalize_by_type(records: List[Dict], source_type: str) -> List[NormalizedR
         # Just convert to NormalizedRecord format
         results = []
         for record in records:
+            normalized_data = coerce_to_json_serializable(record.get("data", {}))
             normalized = NormalizedRecord(
-                data=record["data"],
+                data=normalized_data,
                 source_type="yaml_block",
                 extraction_confidence=record.get("confidence", 0.95),
                 provenance=record.get("metadata", {})

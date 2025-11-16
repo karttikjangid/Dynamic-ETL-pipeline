@@ -33,7 +33,7 @@ LOGGER = get_logger(__name__)
 
 def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> UploadResponse:
     """Process a newly uploaded file and return upload metadata.
-    
+
     Args:
         file_path: Path to the file to process
         source_id: Identifier for the data source
@@ -50,7 +50,7 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     mongo_connection = MongoConnection.get_instance()
     db = mongo_connection.get_database(db_name)
     sqlite_connection = SQLiteConnection.get_instance()
-    
+
     # Evidence tracking for Tier-B
     evidence = {}
 
@@ -101,7 +101,7 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     categorized = categorize_records_by_storage(normalized_records)
     mongodb_records = categorized["mongodb"]
     sqlite_records = categorized["sqlite"]
-    
+
     evidence["storage_routing"] = {
         "mongodb_records": len(mongodb_records),
         "sqlite_records": len(sqlite_records)
@@ -118,13 +118,14 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
             # Log NER failure but don't block the pipeline
             LOGGER.warning("NER processing failed for source '%s': %s", source_id, exc)
             evidence["ner"] = {"status": "failed", "error": str(exc)}
-    
+
     records_normalized = len(normalized_docs)
 
     if records_normalized == 0:
         raise NormalizationError("Normalized payloads are empty")
 
     existing_schema = None
+    sqlite_schema: Optional[SchemaMetadata] = None
     try:
         existing_schema = schema_service.get_current_schema(source_id)
     except SchemaInferenceError:
@@ -132,14 +133,18 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
 
     try:
         new_schema = schema_service.compute_schema_for_source(normalized_records, source_id)
+        if sqlite_records:
+            sqlite_schema = schema_service.compute_schema_for_source(sqlite_records, source_id)
         # Update compatible databases based on schema shape
-        compatible_dbs = get_compatible_dbs_for_schema(new_schema)
+        compatible_dbs = get_compatible_dbs_for_schema(new_schema, sqlite_schema)
         new_schema.compatible_dbs = compatible_dbs
         evidence["schema_inference"] = {
             "status": "success",
             "fields_detected": len(new_schema.fields),
             "compatible_dbs": compatible_dbs
         }
+        if sqlite_schema:
+            evidence["schema_inference"]["sqlite_fields"] = len(sqlite_schema.fields)
     except Exception as exc:  # pragma: no cover
         LOGGER.exception("Schema inference failed for source '%s': %s", source_id, exc)
         evidence["schema_inference"] = {"status": "failed", "error": str(exc)}
@@ -164,13 +169,23 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     )
     active_schema = existing_schema if duplicate_upload and existing_schema else prepared_schema
 
+    sqlite_schema_versioned: Optional[SchemaMetadata] = None
+    if sqlite_schema:
+        sqlite_schema_versioned = sqlite_schema.model_copy(
+            update={
+                "version": target_version,
+                "schema_id": f"{schema_id}__sqlite",
+                "extraction_stats": combined_stats,
+            }
+        )
+
     if existing_schema and not duplicate_upload:
         schema_service.handle_schema_evolution(source_id, existing_schema, prepared_schema)
 
     # Storage preparation and insertion
     mongodb_inserted = 0
     sqlite_inserted = 0
-    
+
     # MongoDB storage (for JSON/YAML)
     if mongodb_records:
         if not duplicate_upload:
@@ -179,31 +194,35 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
             )
             if not collection_created:
                 raise StorageError("Failed to prepare MongoDB collection")
-        
+
         mongodb_docs = _serialize_normalized_records(mongodb_records)
         valid_docs = _filter_valid_documents(mongodb_docs, active_schema)
         mongodb_inserted = document_inserter.batch_insert_documents(
             db, collection_name, valid_docs, batch_size=DEFAULT_BATCH_SIZE
         )
         LOGGER.info(f"Inserted {mongodb_inserted} records into MongoDB")
-    
+
     # SQLite storage (for CSV/HTML/KV)
-    if sqlite_records and "sqlite" in prepared_schema.compatible_dbs:
+    if (
+        sqlite_records
+        and "sqlite" in prepared_schema.compatible_dbs
+        and sqlite_schema_versioned is not None
+    ):
         table_name = get_table_name(source_id, target_version)
-        
+
         if not duplicate_upload:
             table_created = create_table_from_schema(
-                sqlite_connection, table_name, prepared_schema
+                sqlite_connection, table_name, sqlite_schema_versioned
             )
             if not table_created:
                 raise StorageError("Failed to prepare SQLite table")
-        
+
         sqlite_docs = _serialize_normalized_records(sqlite_records)
         sqlite_inserted = batch_insert_documents_sqlite(
             sqlite_connection, table_name, sqlite_docs, source_id
         )
         LOGGER.info(f"Inserted {sqlite_inserted} records into SQLite table '{table_name}'")
-    
+
     inserted = mongodb_inserted + sqlite_inserted
     evidence["storage"] = {
         "mongodb_inserted": mongodb_inserted,

@@ -3,23 +3,31 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-_LOGGER: Optional[logging.Logger] = None
+_LOGGER_CONFIGURED = False
+
+
+def _configure_logging() -> None:
+    global _LOGGER_CONFIGURED
+    if _LOGGER_CONFIGURED:
+        return
+
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
+    _LOGGER_CONFIGURED = True
 
 
 def get_logger(name: str = "dynamic_etl") -> logging.Logger:
-    """Return a module-level logger configured once."""
+    """Return a logger configured with the shared formatter/handlers."""
 
-    global _LOGGER
-    if _LOGGER is None:
-        _LOGGER = logging.getLogger(name)
-        if not _LOGGER.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            handler.setFormatter(formatter)
-            _LOGGER.addHandler(handler)
-        _LOGGER.setLevel(logging.INFO)
-    return _LOGGER
+    _configure_logging()
+    return logging.getLogger(name)

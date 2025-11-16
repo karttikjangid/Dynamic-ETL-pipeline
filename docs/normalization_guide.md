@@ -2,7 +2,7 @@
 
 **Dynamic ETL Pipeline - Data Normalization Layer**
 
-> Last Updated: November 15, 2025  
+> Last Updated: November 15, 2025
 > Version: 1.0
 
 ---
@@ -16,7 +16,8 @@
 5. [Type Inference](#type-inference)
 6. [Key Standardization](#key-standardization)
 7. [Usage Examples](#usage-examples)
-8. [Best Practices](#best-practices)
+8. [YAML Blocks](#yaml-blocks)
+9. [Best Practices](#best-practices)
 
 ---
 
@@ -84,10 +85,10 @@ Transforms key-value pairs (extracted as strings) into properly-typed Python obj
 def normalize(self, records: List[Dict]) -> List[NormalizedRecord]:
     """
     Normalize list of KV records into NormalizedRecord objects.
-    
+
     Args:
         records: List of dicts with 'data', 'source_type', 'confidence' keys
-        
+
     Returns:
         List of NormalizedRecord objects with normalized data
     """
@@ -133,10 +134,10 @@ Normalizes JSON objects by recursively applying type inference to string values 
 def normalize(self, records: List[Dict]) -> List[NormalizedRecord]:
     """
     Normalize list of JSON records into NormalizedRecord objects.
-    
+
     Args:
         records: List of dicts with 'data', 'source_type', 'confidence' keys
-        
+
     Returns:
         List of NormalizedRecord objects with normalized data
     """
@@ -193,7 +194,7 @@ def normalize(self, records: List[Dict]) -> List[NormalizedRecord]:
 def normalize_json_record(record: Dict) -> Optional[Dict]:
     """
     Normalize a single JSON record.
-    
+
     Recursively processes the JSON structure, applying type inference
     to string values while preserving the overall shape.
     """
@@ -205,7 +206,7 @@ def normalize_json_record(record: Dict) -> Optional[Dict]:
 def clean_json_values(value: Any) -> Any:
     """
     Recursively normalize JSON values.
-    
+
     Handles:
     - Dicts: recurse on all values
     - Lists: recurse on all elements
@@ -569,6 +570,55 @@ print(normalized[0].data)
 
 ---
 
+## YAML Blocks
+
+Front-matter and inline YAML fragments are parsed with PyYAML, which eagerly
+converts ISO-looking scalars (e.g., `2025-11-18`) into Python ``datetime``
+objects. Those objects are not JSON-serializable and previously caused schema
+inference and MongoDB validation errors.
+
+### Automatic Scalar Coercion
+
+- `extractors/yaml_extractor.py` runs every parsed block through
+    `coerce_to_json_serializable()` (see `utils/serialization.py`).
+- The helper walks the entire structure and turns any ``datetime``/``date``/``time``
+    instances into ISO8601 strings before the records hit normalization.
+- The YAML branch of `normalizers/orchestrator.py` applies the same helper as a
+    safety net for any future extractors.
+
+### Why It Matters
+
+- **Schema inference stays deterministic**: Genson now only sees JSON-native
+    types, so it does not reject YAML-derived fields like `published` or
+    `ingested_at`.
+- **Storage validation passes**: MongoDB schemas that expect strings continue to
+    receive strings, avoiding `_is_valid_type` failures.
+- **Evidence is repeatable**: ISO8601 strings retain the exact value emitted by
+    the source content, making diffs and audits straightforward.
+
+### Example
+
+```yaml
+---
+title: "Widget A - 2025"
+published: 2025-11-18
+---
+```
+
+After YAML extraction:
+
+```json
+{
+    "title": "Widget A - 2025",
+    "published": "2025-11-18"
+}
+```
+
+The coerced value flows through normalization, schema inference, and storage
+without any custom handling from downstream components.
+
+---
+
 ## Best Practices
 
 ### 1. Always Normalize Before Schema Inference
@@ -725,11 +775,11 @@ def test_kv_normalization_pipeline():
     # Extract
     extractor = KVExtractor()
     records = extractor.extract(test_content)
-    
+
     # Normalize
     normalizer = KVNormalizer()
     normalized = normalizer.normalize([r.dict() for r in records])
-    
+
     # Verify
     assert len(normalized) > 0
     assert all(isinstance(r, NormalizedRecord) for r in normalized)
@@ -824,10 +874,10 @@ class KVNormalizer(BaseNormalizer):
 def normalize_kv_record(record: Dict[str, str]) -> Optional[Dict]:
     """
     Normalize a single KV record.
-    
+
     Args:
         record: Dict with string keys and values
-        
+
     Returns:
         Normalized dict with typed values, or None if empty
     """
@@ -839,10 +889,10 @@ def normalize_kv_record(record: Dict[str, str]) -> Optional[Dict]:
 def infer_value_type(value: str) -> Any:
     """
     Infer and convert string value to appropriate type.
-    
+
     Args:
         value: String value to type-infer
-        
+
     Returns:
         Typed value (bool, int, float, None, or str)
     """
@@ -854,10 +904,10 @@ def infer_value_type(value: str) -> Any:
 def standardize_key_names(record: Dict) -> Dict:
     """
     Standardize all keys in a record.
-    
+
     Args:
         record: Dict with potentially inconsistent keys
-        
+
     Returns:
         Dict with standardized keys
     """
