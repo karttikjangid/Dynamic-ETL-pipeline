@@ -12,6 +12,7 @@ os.environ.setdefault("ETL_MONGODB_URI", "mongodb://localhost:27017")
 
 from services import pipeline_service
 from storage.connection import MongoConnection
+from storage.sqlite_connection import SQLiteConnection
 
 
 class _FakeMongoConnection:
@@ -62,3 +63,21 @@ def stub_collection_creation(monkeypatch):
         "create_collection_from_schema",
         _noop_create_collection,
     )
+
+
+@pytest.fixture(autouse=True)
+def isolated_sqlite_connection(monkeypatch, tmp_path):
+    """Provide a fresh SQLite database per test and override the singleton."""
+
+    db_path = tmp_path / "etl_pipeline.sqlite"
+    connection = SQLiteConnection(db_path=str(db_path))
+
+    monkeypatch.setattr(
+        SQLiteConnection,
+        "get_instance",
+        staticmethod(lambda: connection),
+    )
+
+    yield connection
+
+    connection.disconnect()

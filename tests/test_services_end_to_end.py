@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from services.pipeline_service import process_upload
@@ -116,3 +118,62 @@ def test_multiple_fragments_with_complex_queries(tmp_path):
     )
     assert sorted_query.result_count == 1
     assert sorted_query.results[0]["user_id"] == 1002
+
+
+@pytest.mark.integration
+def test_sqlite_engine_query_execution(tmp_path):
+    """Ensure SQLite-routed sources can be queried via the new engine flag."""
+
+    source_id = "demo-sqlite"
+    repo_root = Path(__file__).resolve().parents[1]
+    template_path = repo_root / "test_data" / "sample_tier_b_sqlite.txt"
+
+    if not template_path.is_file():
+        pytest.skip("SQLite sample file not found; skipping test.")
+
+    sample_file = tmp_path / "sample_sqlite.txt"
+    sample_file.write_text(template_path.read_text())
+
+    response = process_upload(str(sample_file), source_id)
+
+    assert response.status == "success"
+    assert response.evidence["storage"].get("sqlite_inserted", 0) >= 1
+
+    schema = schema_service.get_current_schema(source_id)
+    assert "sqlite" in schema.compatible_dbs
+
+    # Query CSV-derived account balances using SQLite engine
+    account_query = query_service.execute_query(
+        source_id,
+        {
+            "engine": "sqlite",
+            "select": ["account_id", "branch_code", "currency", "balance", "status"],
+            "where": {
+                "status": "active",
+                "balance": {"$gt": 9000},
+            },
+            "order_by": [["balance", "desc"]],
+            "limit": 5,
+        },
+    )
+
+    assert account_query.result_count >= 1
+    assert all(row["status"] == "active" for row in account_query.results)
+    assert account_query.query["engine"] == "sqlite"
+
+    # Query HTML-derived SLA rows using pattern matching
+    sla_query = query_service.execute_query(
+        source_id,
+        {
+            "engine": "sqlite",
+            "select": ["branch_code", "ticket_tier", "response_minutes", "resolution_hours"],
+            "where": {
+                "ticket_tier": {"$like": "tier-b%"},
+                "response_minutes": {"$lte": 60},
+            },
+            "order_by": [["response_minutes", "asc"]],
+        },
+    )
+
+    assert sla_query.result_count == 2
+    assert {row["ticket_tier"] for row in sla_query.results} == {"tier-b"}

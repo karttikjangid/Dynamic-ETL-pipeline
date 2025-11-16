@@ -208,13 +208,44 @@ curl -X POST \
 	 http://localhost:8000/upload
 ```
 
-### Query Example
+### Query Examples
+
+#### MongoDB engine (default)
 
 ```bash
 curl -X POST "http://localhost:8000/query?source_id=demo_notes" \
 	 -H "Content-Type: application/json" \
-	 -d '{"field": {"$eq": 42}}'
+	 -d '{
+	   "filter": {"field": {"$eq": 42}},
+	   "limit": 25
+	 }'
 ```
+
+#### SQLite engine
+
+Structured/tabular sources (CSV, HTML tables, KV blocks) can be queried via SQLite by setting `engine` to `"sqlite"` and providing SQL-inspired clauses:
+
+```bash
+curl -X POST "http://localhost:8000/query?source_id=demo_tables" \
+	 -H "Content-Type: application/json" \
+	 -d '{
+	   "engine": "sqlite",
+	   "select": ["account_id", "branch_code", "balance", "status"],
+	   "where": {
+	     "status": "active",
+	     "balance": {"$gt": 9000}
+	   },
+	   "order_by": [["balance", "desc"]],
+	   "limit": 10
+	 }'
+```
+
+Supported SQLite clauses:
+
+- `select`: list of column names (defaults to `*`).
+- `where`: dict of column ➜ value / operator maps supporting `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, and `$like`.
+- `order_by`: list of `[column, direction]` or `{column: direction}` entries where direction may be `asc`, `desc`, `1`, or `-1`.
+- `limit`: positive integer (defaults to 100, capped at 1000).
 
 Use the returned `query_id` (if provided) to fetch records:
 
