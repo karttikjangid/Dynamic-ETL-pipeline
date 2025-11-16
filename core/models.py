@@ -11,28 +11,33 @@ from pydantic import BaseModel
 class ExtractedRecord(BaseModel):
     """Single record extracted from source files."""
 
-    data: Dict[str, Any]
-    source_type: str  # "json" or "kv"
+    data: Union[Dict[str, Any], List[Dict[str, Any]]]  # Dict for single records, List[Dict] for tables/CSV
+    source_type: str  # "json", "kv", "html_table", "csv_block", "yaml_block"
     confidence: float = 1.0
+    metadata: Optional[Dict[str, Any]] = None  # Tier-B: offsets, fragment_id, etc.
 
 
 class NormalizedRecord(BaseModel):
     """Record produced by normalization orchestrators."""
 
     data: Dict[str, Any]
-    original_source: str
+    source_type: str
     extraction_confidence: float
+    provenance: Optional[Dict[str, Any]] = None  # Tier-B: fragment tracking
 
 
 class SchemaField(BaseModel):
     """Definition for a single field in the inferred schema."""
 
     name: str
+    path: Optional[str] = None  # Tier-B: nested path like "pricing.price_usd"
     type: str
     nullable: bool = True
     example_value: Optional[Any] = None
     confidence: float = 1.0
-    source_path: Optional[str] = None
+    source_offsets: Optional[List[int]] = None  # Tier-B: where field appears
+    suggested_index: bool = False  # Tier-B: hint for SQLite indexes
+    source_path: Optional[str] = None  # Legacy support
 
 
 class SchemaMetadata(BaseModel):
@@ -46,6 +51,10 @@ class SchemaMetadata(BaseModel):
     compatible_dbs: List[str] = ["mongodb"]
     record_count: int
     extraction_stats: Dict[str, Union[int, float]]
+    primary_key_candidates: Optional[List[str]] = None  # Tier-B
+    migration_notes: Optional[str] = None  # Tier-B
+    version_diff: Optional[Dict[str, Any]] = None  # Tier-B: DeepDiff output
+    genson_schema: Optional[Dict[str, Any]] = None  # Tier-B: raw Genson schema
 
 
 class SchemaDiff(BaseModel):
@@ -64,15 +73,18 @@ class UploadResponse(BaseModel):
     source_id: str
     file_id: str
     schema_id: str
+    version: int  # Tier-B
     records_extracted: int
     records_normalized: int
     parsed_fragments_summary: Dict[str, int]
+    evidence: Optional[Dict[str, Any]] = None  # Tier-B: phase-by-phase evidence
+    schema_metadata: Optional[SchemaMetadata] = None  # Tier-B: full schema in response
 
 
 class GetSchemaResponse(BaseModel):
     """Response for current schema retrieval."""
 
-    schema: SchemaMetadata
+    schema_data: SchemaMetadata
     compatible_dbs: List[str]
 
 

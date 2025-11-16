@@ -1,0 +1,46 @@
+# Tier-B sample focused on SQLite-compatible fragments
+
+--- KV BLOCK: Branch Summary ---
+branch_name: Redwood Logistics
+region: West Coast
+active_accounts: 3
+primary_contact: Jamie Patel
+sla_hours: 12
+
+--- CSV BLOCK: Branch Accounts ---
+account_id,branch_code,currency,balance,status
+AC-1001,RW-01,USD,15420.55,active
+AC-1002,RW-02,USD,9875.10,active
+AC-1003,RW-03,EUR,6420.00,inactive
+
+--- HTML TABLE: Regional SLA Targets ---
+<table>
+  <thead>
+    <tr>
+      <th>branch_code</th>
+      <th>ticket_tier</th>
+      <th>response_minutes</th>
+      <th>resolution_hours</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RW-01</td>
+      <td>tier-a</td>
+      <td>30</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>RW-02</td>
+      <td>tier-b</td>
+      <td>45</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>RW-03</td>
+      <td>tier-b</td>
+      <td>60</td>
+      <td>8</td>
+    </tr>
+  </tbody>
+</table>

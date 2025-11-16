@@ -71,8 +71,20 @@ def validate_query_payload(payload: Dict[str, Any]) -> None:
     if not payload:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query payload cannot be empty.")
 
+    engine = payload.get("engine")
+    if engine is not None:
+        if not isinstance(engine, str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="engine must be a string.")
+        normalized_engine = engine.lower()
+        if normalized_engine not in {"mongodb", "sqlite"}:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="engine must be either 'mongodb' or 'sqlite'.")
+
     # Reject natural-language strings masquerading as queries to enforce strict structured queries.
-    if any(isinstance(value, str) and value.strip().split(" ")[0].lower() in {"select", "find", "show"} for value in payload.values()):
+    if any(
+        isinstance(value, str) and value.strip().split(" ")[0].lower() in {"select", "find", "show"}
+        for key, value in payload.items()
+        if key not in {"engine"}
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Natural language or raw textual queries are not supported. Provide a structured dict payload.",

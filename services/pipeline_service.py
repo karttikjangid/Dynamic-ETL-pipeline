@@ -21,6 +21,10 @@ from services import schema_service
 from services.ner_service import apply_ner_to_fragments
 from storage import collection_manager, document_inserter, schema_store
 from storage.connection import MongoConnection
+from storage.sqlite_connection import SQLiteConnection
+from storage.sqlite_table_manager import create_table_from_schema, get_table_name
+from storage.sqlite_document_inserter import batch_insert_documents_sqlite
+from storage.storage_router import categorize_records_by_storage, get_compatible_dbs_for_schema
 from utils.logger import get_logger
 
 
@@ -43,37 +47,65 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     file_id = uuid4().hex
     db_name = get_database_name(source_id)
     collection_name = get_collection_name(source_id)
-    connection = MongoConnection.get_instance()
-    db = connection.get_database(db_name)
+    mongo_connection = MongoConnection.get_instance()
+    db = mongo_connection.get_database(db_name)
+    sqlite_connection = SQLiteConnection.get_instance()
+    
+    # Evidence tracking for Tier-B
+    evidence = {}
 
     try:
         extracted_records, fragment_stats = extract_all_records(str(resolved_path))
+        evidence["extraction"] = {
+            "status": "success",
+            "fragments": fragment_stats,
+            "total_records": len(extracted_records)
+        }
     except Exception as exc:  # pragma: no cover - extractor errors bubbled
         LOGGER.exception("Extraction failed for '%s': %s", file_path, exc)
+        evidence["extraction"] = {"status": "failed", "error": str(exc)}
         raise ExtractionError("Unable to extract records") from exc
 
     records_extracted = len(extracted_records)
     if records_extracted == 0:
+        evidence["extraction"]["status"] = "empty"
         return UploadResponse(
             status="empty",
             source_id=source_id,
             file_id=file_id,
             schema_id="",
+            version=0,
             records_extracted=0,
             records_normalized=0,
             parsed_fragments_summary=fragment_stats,
+            evidence=evidence
         )
 
     extracted_payloads: List[Dict[str, Any]] = [record.model_dump() for record in extracted_records]
 
     try:
         normalized_records = normalize_all_records(extracted_payloads)
+        evidence["normalization"] = {
+            "status": "success",
+            "records_normalized": len(normalized_records)
+        }
     except Exception as exc:  # pragma: no cover - normalization errors bubbled
         LOGGER.exception("Normalization failed for source '%s': %s", source_id, exc)
+        evidence["normalization"] = {"status": "failed", "error": str(exc)}
         raise NormalizationError("Unable to normalize records") from exc
 
     if not normalized_records:
         raise NormalizationError("No records produced after normalization")
+
+    # Categorize records by storage type (MongoDB vs SQLite)
+    categorized = categorize_records_by_storage(normalized_records)
+    mongodb_records = categorized["mongodb"]
+    sqlite_records = categorized["sqlite"]
+    
+    evidence["storage_routing"] = {
+        "mongodb_records": len(mongodb_records),
+        "sqlite_records": len(sqlite_records)
+    }
 
     # Apply NER if enabled (after normalization, before storage)
     normalized_docs = _serialize_normalized_records(normalized_records)
@@ -81,9 +113,11 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
         try:
             normalized_docs = apply_ner_to_fragments(normalized_docs)
             LOGGER.info("NER applied to %d fragments for source '%s'", len(normalized_docs), source_id)
+            evidence["ner"] = {"status": "success", "fragments_enriched": len(normalized_docs)}
         except Exception as exc:
             # Log NER failure but don't block the pipeline
             LOGGER.warning("NER processing failed for source '%s': %s", source_id, exc)
+            evidence["ner"] = {"status": "failed", "error": str(exc)}
     
     records_normalized = len(normalized_docs)
 
@@ -98,8 +132,17 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
 
     try:
         new_schema = schema_service.compute_schema_for_source(normalized_records, source_id)
+        # Update compatible databases based on schema shape
+        compatible_dbs = get_compatible_dbs_for_schema(new_schema)
+        new_schema.compatible_dbs = compatible_dbs
+        evidence["schema_inference"] = {
+            "status": "success",
+            "fields_detected": len(new_schema.fields),
+            "compatible_dbs": compatible_dbs
+        }
     except Exception as exc:  # pragma: no cover
         LOGGER.exception("Schema inference failed for source '%s': %s", source_id, exc)
+        evidence["schema_inference"] = {"status": "failed", "error": str(exc)}
         raise SchemaInferenceError("Schema generation failed") from exc
 
     target_version = 1
@@ -124,17 +167,49 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     if existing_schema and not duplicate_upload:
         schema_service.handle_schema_evolution(source_id, existing_schema, prepared_schema)
 
-    if not duplicate_upload:
-        collection_created = collection_manager.create_collection_from_schema(
-            db, collection_name, prepared_schema
+    # Storage preparation and insertion
+    mongodb_inserted = 0
+    sqlite_inserted = 0
+    
+    # MongoDB storage (for JSON/YAML)
+    if mongodb_records:
+        if not duplicate_upload:
+            collection_created = collection_manager.create_collection_from_schema(
+                db, collection_name, prepared_schema
+            )
+            if not collection_created:
+                raise StorageError("Failed to prepare MongoDB collection")
+        
+        mongodb_docs = _serialize_normalized_records(mongodb_records)
+        valid_docs = _filter_valid_documents(mongodb_docs, active_schema)
+        mongodb_inserted = document_inserter.batch_insert_documents(
+            db, collection_name, valid_docs, batch_size=DEFAULT_BATCH_SIZE
         )
-        if not collection_created:
-            raise StorageError("Failed to prepare MongoDB collection")
-
-    valid_docs = _filter_valid_documents(normalized_docs, active_schema)
-    inserted = document_inserter.batch_insert_documents(
-        db, collection_name, valid_docs, batch_size=DEFAULT_BATCH_SIZE
-    )
+        LOGGER.info(f"Inserted {mongodb_inserted} records into MongoDB")
+    
+    # SQLite storage (for CSV/HTML/KV)
+    if sqlite_records and "sqlite" in prepared_schema.compatible_dbs:
+        table_name = get_table_name(source_id, target_version)
+        
+        if not duplicate_upload:
+            table_created = create_table_from_schema(
+                sqlite_connection, table_name, prepared_schema
+            )
+            if not table_created:
+                raise StorageError("Failed to prepare SQLite table")
+        
+        sqlite_docs = _serialize_normalized_records(sqlite_records)
+        sqlite_inserted = batch_insert_documents_sqlite(
+            sqlite_connection, table_name, sqlite_docs, source_id
+        )
+        LOGGER.info(f"Inserted {sqlite_inserted} records into SQLite table '{table_name}'")
+    
+    inserted = mongodb_inserted + sqlite_inserted
+    evidence["storage"] = {
+        "mongodb_inserted": mongodb_inserted,
+        "sqlite_inserted": sqlite_inserted,
+        "total_inserted": inserted
+    }
 
     if inserted == 0:
         LOGGER.warning("No documents inserted for source '%s'", source_id)
@@ -151,9 +226,12 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
         source_id=source_id,
         file_id=file_id,
         schema_id=response_schema_id,
+        version=target_version,
         records_extracted=records_extracted,
         records_normalized=inserted,
         parsed_fragments_summary=fragment_stats,
+        evidence=evidence,
+        schema_metadata=prepared_schema
     )
 
 

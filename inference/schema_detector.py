@@ -6,7 +6,6 @@ from collections import Counter
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import pyarrow as pa
 
 
 def walk_paths(obj: Any, parent_path: str = "") -> List[tuple]:
@@ -476,68 +475,3 @@ def load_records_to_dataframe(records: List[Dict]) -> pd.DataFrame:
         return pd.DataFrame()
     
     return pd.DataFrame(records)
-
-
-def infer_arrow_schema(df: pd.DataFrame) -> pa.Schema:
-    """Use Arrow to stabilize inferred schema.
-    
-    Converts a pandas DataFrame to PyArrow format and extracts its schema.
-    PyArrow provides robust type inference that can handle mixed types
-    better than pandas alone.
-    
-    Args:
-        df: pandas DataFrame
-        
-    Returns:
-        PyArrow Schema object
-        
-    Note:
-        This function requires pyarrow, which is a heavy dependency.
-        For production use with stdlib-only requirements, use the
-        type_mapper functions instead.
-        
-    Examples:
-        >>> df = pd.DataFrame({"a": [1, 2, 3]})
-        >>> schema = infer_arrow_schema(df)
-        >>> str(schema)
-        'a: int64'
-    """
-    if df.empty:
-        return pa.schema([])
-    
-    # Convert DataFrame to Arrow Table
-    table = pa.Table.from_pandas(df)
-    
-    return table.schema
-
-
-def extract_field_types(arrow_schema: pa.Schema) -> Dict[str, str]:
-    """Convert Arrow schema to simple type mapping.
-    
-    Extracts field names and types from a PyArrow schema and converts
-    them to application-level type names using the type mapper.
-    
-    Args:
-        arrow_schema: PyArrow Schema object
-        
-    Returns:
-        Dictionary mapping field names to type strings
-        
-    Examples:
-        >>> schema = pa.schema([pa.field("age", pa.int64())])
-        >>> extract_field_types(schema)
-        {'age': 'integer'}
-    """
-    from .type_mapper import map_pyarrow_to_app_type
-    
-    field_types = {}
-    
-    for field in arrow_schema:
-        field_name = field.name
-        arrow_type = str(field.type)
-        
-        # Map to application type
-        app_type = map_pyarrow_to_app_type(arrow_type)
-        field_types[field_name] = app_type
-    
-    return field_types

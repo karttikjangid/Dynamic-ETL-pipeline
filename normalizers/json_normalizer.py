@@ -37,8 +37,9 @@ class JSONNormalizer(BaseNormalizer):
                 # Create NormalizedRecord
                 norm_record = NormalizedRecord(
                     data=normalized_data,
-                    original_source=source_type,
-                    extraction_confidence=confidence
+                    source_type=source_type,
+                    extraction_confidence=confidence,
+                    provenance={"source": source_type}
                 )
                 normalized.append(norm_record)
         
