@@ -174,6 +174,58 @@ curl -X POST \
 }
 ```
 
+#### Example Ingestion Workflow
+
+The ETL pipeline stores JSON/KV records in MongoDB and tabular fragments inside a **per-source, per-version SQLite database**. The example below uploads `tests/test_data/sample_tier_b_tables.txt`, which contains a mix of card transactions and CSV tables, and highlights the response fields you can use later for querying.
+
+```bash
+curl -X POST \
+  -F "file=@tests/test_data/sample_tier_b_tables.txt" \
+  -F "source_id=demo-source" \
+  http://localhost:8000/upload
+```
+
+Sample response excerpt showing the automatically created tabular groups:
+
+```json
+{
+  "status": "success",
+  "source_id": "demo-source",
+  "records_extracted": 12,
+  "records_normalized": 12,
+  "schema_metadata": {
+    "schema_id": "demo-source_v1_abcd1234",
+    "version": 1,
+    "compatible_dbs": ["mongodb", "sqlite"],
+    "tabular_groups": [
+      {
+        "group_id": "grp_transactions",
+        "table_name": "demo_source_v1_00bb3e62",
+        "signature": "00bb3e62d9",
+        "record_count": 6,
+        "fields": [
+          {"name": "transaction_id", "type": "string"},
+          {"name": "status", "type": "string"},
+          {"name": "amount", "type": "number"}
+        ]
+      },
+      {
+        "group_id": "grp_devices",
+        "table_name": "demo_source_v1_e49c3c6d",
+        "signature": "e49c3c6df2",
+        "record_count": 3,
+        "fields": [
+          {"name": "session_id", "type": "string"},
+          {"name": "device_type", "type": "string"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+> ✅ Tip: Persist the `table_name` (or `group_id`) for each tabular group. You will supply one of these identifiers when issuing SQLite queries later.
+
 ---
 
 ### 2. Get Current Schema
@@ -408,6 +460,69 @@ POST /query
 
 **String Operators**:
 - `$like`: SQL LIKE pattern matching
+
+#### Example: Schema-driven SQLite Query
+
+1. **Get the current schema** to discover tabular groups and their tables:
+
+   ```bash
+   curl "http://localhost:8000/schema?source_id=demo-source"
+   ```
+
+   Response excerpt:
+
+   ```json
+   {
+     "schema_data": {
+       "tabular_groups": [
+         {
+           "group_id": "grp_transactions",
+           "table_name": "demo_source_v1_00bb3e62",
+           "fields": ["transaction_id", "status", "amount", "currency"]
+         }
+       ]
+     }
+   }
+   ```
+
+2. **Query a specific SQLite table** by passing the `table` value and any filter/selection requirements:
+
+   ```bash
+   curl -X POST "http://localhost:8000/query?source_id=demo-source" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "engine": "sqlite",
+       "table": "demo_source_v1_00bb3e62",
+       "select": ["transaction_id", "status", "amount"],
+       "where": {
+         "status": {"$eq": "settled"},
+         "amount": {"$gt": 100}
+       },
+       "order_by": [["amount", "desc"]],
+       "limit": 5
+     }'
+   ```
+
+   Sample response:
+
+   ```json
+   {
+     "query": {
+       "engine": "sqlite",
+       "table": "demo_source_v1_00bb3e62",
+       "select": ["transaction_id", "status", "amount"],
+       "where": {"status": {"$eq": "settled"}, "amount": {"$gt": 100}}
+     },
+     "results": [
+       {"transaction_id": "tx-9001", "status": "settled", "amount": 250.5},
+       {"transaction_id": "tx-9010", "status": "settled", "amount": 180.0}
+     ],
+     "result_count": 2,
+     "execution_time_ms": 6.14
+   }
+   ```
+
+> 🔎 If you omit `table`, the API will run against the first stored tabular group. Explicitly providing the table (or `group_id`) ensures you are reading from the intended schema in a per-version database.
 
 #### Request Examples
 
