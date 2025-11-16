@@ -52,13 +52,12 @@ def handle_duplicate_upload(
     if schema_to_compare is None:
         return False
 
-    # Use Genson signature if available (Tier-B), otherwise fallback to field signature (Tier-A)
-    if new_schema.genson_schema and schema_to_compare.genson_schema:
-        old_signature = compute_schema_signature(schema_to_compare.genson_schema)
-        new_signature = compute_schema_signature(new_schema.genson_schema)
-    else:
-        old_signature = _schema_signature(schema_to_compare)
-        new_signature = _schema_signature(new_schema)
+    # Use Genson signature for schema comparison
+    if not new_schema.genson_schema or not schema_to_compare.genson_schema:
+        return False
+
+    old_signature = compute_schema_signature(schema_to_compare.genson_schema)
+    new_signature = compute_schema_signature(new_schema.genson_schema)
 
     is_duplicate = old_signature == new_signature
     if is_duplicate:
@@ -66,7 +65,4 @@ def handle_duplicate_upload(
     return is_duplicate
 
 
-def _schema_signature(schema: SchemaMetadata) -> Tuple[Tuple[str, str, bool], ...]:
-    return tuple(
-        sorted((field.name, field.type, field.nullable) for field in schema.fields)
-    )
+

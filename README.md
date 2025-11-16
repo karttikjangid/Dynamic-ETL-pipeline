@@ -100,8 +100,7 @@ def get_compatible_dbs_for_schema(schema: SchemaMetadata) -> List[str]:
 
 **Schema signatures** determine version changes, not upload frequency:
 
-- **Tier-B (Advanced)**: Genson-based structural hashing
-- **Tier-A (Fallback)**: Field tuple comparison `(name, type, nullable)`
+- **Genson-based structural hashing**
 - **Duplicate Detection**: Identical signatures reuse existing versions
 - **Change Triggers**: Field additions/removals, type changes, nullability shifts
 
@@ -255,7 +254,6 @@ signature = compute_schema_signature(genson_schema)  # Hash for comparison
 1. **Signature Comparison**: Genson-based structural hashing
 2. **Duplicate Detection**: Identical signatures reuse existing versions
 3. **Change Triggers**: Field additions/removals, type changes, nullability shifts
-4. **Fallback**: Field-based tuple comparison for backward compatibility
 
 ```python
 # Version increment logic
