@@ -18,7 +18,7 @@ The pipeline extracts and processes the following data formats from `.txt`, `.md
 ### Prerequisites
 
 - Python 3.11+
-- MongoDB instance (development: `mongomock`)
+- MongoDB instance (For testing: `mongomock`)
 - SQLite (auto-managed)
 
 ### Setup
