@@ -1,6 +1,6 @@
 # Dynamic ETL Pipeline
 
-Modular Tier-A pipeline for deterministic ingestion of JSON blobs, key–value sections, and Markdown code blocks sourced from `.txt` and `.md` files. Extracts and normalizes structured fragments, infers and versions schemas, routes to MongoDB (complex data) or SQLite (tabular data), and exposes strict query endpoints via FastAPI.
+Modular pipeline for deterministic ingestion of JSON blobs, key–value sections, and Markdown code blocks sourced from `.txt` and `.md` files. Extracts and normalizes structured fragments, infers and versions schemas, routes to MongoDB (complex data) or SQLite (tabular data), and exposes strict query endpoints via FastAPI.
 
 ## Quick Start
 
