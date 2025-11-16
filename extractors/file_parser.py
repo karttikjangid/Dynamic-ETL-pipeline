@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
+from .pdf_parser import parse_pdf_file
+
 
 def parse_file(file_path: str) -> str:
     """Dispatch parsing based on extension."""
@@ -15,6 +17,8 @@ def parse_file(file_path: str) -> str:
         return parse_md_file(file_path)
     if suffix == ".txt":
         return parse_txt_file(file_path)
+    if suffix == ".pdf":
+        return parse_pdf_file(file_path)
     raise NotImplementedError(f"Unsupported file type: {suffix}")
 
 

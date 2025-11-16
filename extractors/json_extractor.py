@@ -28,13 +28,19 @@ class JSONExtractor(BaseExtractor):
         
         for fragment in fragments:
             parsed_data = parse_json_string(fragment["raw"])
+            metadata = {
+                "chunk_id": fragment["chunk_id"],
+                "offset_start": fragment["start"],
+                "offset_end": fragment["end"],
+            }
             
             if parsed_data is not None:
                 # Successfully parsed JSON - create ExtractedRecord
                 record = ExtractedRecord(
                     data=parsed_data,
                     source_type="json",
-                    confidence=1.0
+                    confidence=1.0,
+                    metadata=metadata,
                 )
                 records.append(record)
             else:
@@ -48,7 +54,8 @@ class JSONExtractor(BaseExtractor):
                         "end": fragment["end"]
                     },
                     source_type="json",
-                    confidence=0.5
+                    confidence=0.5,
+                    metadata=metadata,
                 )
                 records.append(record)
         

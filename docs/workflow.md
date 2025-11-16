@@ -58,7 +58,7 @@ class ExtractedRecord(BaseModel):
 ```
 
 ### Extraction Process
-1. **File Parsing**: `extractors/file_parser.py` handles `.txt` and `.md` files
+1. **File Parsing**: `extractors/file_parser.py` handles `.txt`, `.md`, and text-only `.pdf` files
 2. **Fragment Detection**: Identifies JSON blocks, key-value sections, code blocks
 3. **Type Classification**: Assigns source types based on detected patterns
 4. **Confidence Scoring**: Rates extraction reliability

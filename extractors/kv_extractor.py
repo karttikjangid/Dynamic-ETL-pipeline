@@ -27,10 +27,16 @@ class KVExtractor(BaseExtractor):
         
         for fragment in fragments:
             # Create ExtractedRecord for each KV block
+            metadata = {
+                "chunk_id": fragment["chunk_id"],
+                "offset_start": fragment["start"],
+                "offset_end": fragment["end"],
+            }
             record = ExtractedRecord(
                 data=fragment["content"],
                 source_type="kv",
-                confidence=1.0
+                confidence=1.0,
+                metadata=metadata
             )
             records.append(record)
         

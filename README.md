@@ -1,10 +1,10 @@
 # Dynamic ETL Pipeline
 
-Modular Tier-B pipeline for deterministic ingestion of structured and semi-structured data from `.txt` and `.md` files. Extracts and normalizes JSON objects, key-value pairs, HTML tables, CSV blocks, YAML fragments, and Markdown code blocks. Infers and versions schemas, routes to MongoDB (complex data) or SQLite (tabular data), and exposes strict query endpoints via FastAPI.
+Modular Tier-B pipeline for deterministic ingestion of structured and semi-structured data from `.txt`, `.md`, and text-based `.pdf` files. Extracts and normalizes JSON objects, key-value pairs, HTML tables, CSV blocks, YAML fragments, and Markdown/PDF code blocks. Infers and versions schemas, routes to MongoDB (complex data) or SQLite (tabular data), and exposes strict query endpoints via FastAPI.
 
 ## Supported Data Formats
 
-The pipeline extracts and processes the following data formats from `.txt` and `.md` files:
+The pipeline extracts and processes the following data formats from `.txt`, `.md`, and text-based `.pdf` files:
 
 - **JSON Objects**: Structured data in JSON format
 - **Key-Value Pairs**: Simple key: value sections
@@ -88,4 +88,4 @@ Quick links to deep-dive documentation:
 
 - [ ] **Add storage for raw text content** - currently only structured fragments are stored; implement raw content preservation for full fidelity
 - [ ] Implement advanced query builders
-- [ ] Add support for additional file formats (PDF, DOCX)
+- [ ] Add support for additional file formats (DOCX, OCR for image-based PDFs)

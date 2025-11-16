@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from fastapi import HTTPException, UploadFile
 from starlette import status
 
-ALLOWED_EXTENSIONS = {".txt", ".md"}
+ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
 SAFE_SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_SOURCE_ID_LENGTH = 60
 
@@ -32,7 +32,11 @@ def validate_upload_payload(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file extension '{extension or 'unknown'}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}.",
+            detail=(
+                "Unsupported file extension "
+                f"'{extension or 'unknown'}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}. "
+                "PDF uploads must contain selectable (non-image) text."
+            ),
         )
 
     normalized_source_id: Optional[str] = None

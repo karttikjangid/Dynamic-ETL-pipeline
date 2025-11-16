@@ -28,6 +28,7 @@ def extract_all_records(file_path: str) -> Tuple[List[ExtractedRecord], Dict[str
     """
     # Parse the file to get text content
     text = parse_file(file_path)
+    pdf_pages = _count_pdf_pages(text)
     
     # Initialize Tier-A extractors
     json_extractor = JSONExtractor()
@@ -59,6 +60,8 @@ def extract_all_records(file_path: str) -> Tuple[List[ExtractedRecord], Dict[str
         "yaml_blocks": len(yaml_records),
         "total_records": len(all_records)
     }
+    if pdf_pages:
+        stats["pdf_pages"] = pdf_pages
     
     # Log stats
     log_extraction_stats(stats)
@@ -98,7 +101,7 @@ def combine_extracted_records(
     )
     
     # Sort by offset if available in metadata
-    def get_offset(record: ExtractedRecord) -> int:
+    def get_offset(record: ExtractedRecord) -> float:
         if record.metadata and "offset_start" in record.metadata:
             return record.metadata["offset_start"]
         return float('inf')  # Records without offset go to end
@@ -120,4 +123,14 @@ def log_extraction_stats(stats: Dict[str, int]) -> None:
     logger.info(f"  HTML tables: {stats.get('html_tables', 0)}")
     logger.info(f"  CSV blocks: {stats.get('csv_blocks', 0)}")
     logger.info(f"  YAML blocks: {stats.get('yaml_blocks', 0)}")
+    if "pdf_pages" in stats:
+        logger.info(f"  PDF pages parsed: {stats.get('pdf_pages', 0)}")
     logger.info(f"  Total records: {stats.get('total_records', 0)}")
+
+
+def _count_pdf_pages(text: str) -> int:
+    """Return inferred PDF page count based on inserted page headers."""
+
+    marker = "--- PAGE "
+    occurrences = text.count(marker)
+    return occurrences if occurrences > 0 else 0

@@ -33,7 +33,7 @@ POST /upload
 **Content-Type**: `multipart/form-data`
 
 **Form Fields**:
-- `file` (required): The file to upload (`.txt` or `.md` extensions) containing any combination of JSON, key-value pairs, HTML tables, CSV blocks, YAML fragments, or Markdown code blocks
+- `file` (required): The file to upload (`.txt`, `.md`, or text-based `.pdf` extensions) containing any combination of JSON, key-value pairs, HTML tables, CSV blocks, YAML fragments, or Markdown/PDF code blocks
 - `source_id` (optional): Custom identifier for the data source. If not provided, auto-generated from filename
 - `version` (optional): Force a specific schema version (positive integer)
 
@@ -151,7 +151,7 @@ curl -X POST \
 **400 Bad Request - Invalid File Type**:
 ```json
 {
-  "detail": "Unsupported file extension '.pdf'. Allowed: .md, .txt."
+  "detail": "Unsupported file extension '.zip'. Allowed: .md, .pdf, .txt. PDF uploads must contain selectable text."
 }
 ```
 
@@ -695,7 +695,7 @@ No rate limiting is currently implemented.
 ## Validation Rules
 
 ### File Upload
-- **Allowed extensions**: `.txt`, `.md`
+- **Allowed extensions**: `.txt`, `.md`, `.pdf` (text-only)
 - **Source ID**: 1-60 characters, letters, numbers, underscores, hyphens, periods only
 - **Version**: Positive integer (if specified)
 

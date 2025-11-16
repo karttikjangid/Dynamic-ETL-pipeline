@@ -28,7 +28,7 @@ This document outlines the core design principles, workflow philosophy, and arch
 
 ### 1. **Extract First** - Parse Raw Files
 **Goal**: Convert unstructured text into structured fragments
-- **Input**: `.txt` and `.md` files with mixed content
+- **Input**: `.txt`, `.md`, and non-image `.pdf` files with mixed content
 - **Process**: Pattern recognition and fragment extraction
 - **Output**: `ExtractedRecord[]` with confidence scores
 - **Principle**: Capture everything, classify later
