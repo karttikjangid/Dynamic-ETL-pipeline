@@ -40,6 +40,17 @@ class SchemaField(BaseModel):
     source_path: Optional[str] = None  # Legacy support
 
 
+class TabularSchemaGroup(BaseModel):
+    """Metadata describing a SQLite table generated for a schema version."""
+
+    group_id: str
+    table_name: str
+    signature: str
+    fields: List[SchemaField]
+    record_count: int = 0
+    ner_labels: Optional[List[str]] = None
+
+
 class SchemaMetadata(BaseModel):
     """Schema output persisted alongside ingested records."""
 
@@ -55,6 +66,7 @@ class SchemaMetadata(BaseModel):
     migration_notes: Optional[str] = None  # Tier-B
     version_diff: Optional[Dict[str, Any]] = None  # Tier-B: DeepDiff output
     genson_schema: Optional[Dict[str, Any]] = None  # Tier-B: raw Genson schema
+    tabular_groups: Optional[List[TabularSchemaGroup]] = None
 
 
 class SchemaDiff(BaseModel):

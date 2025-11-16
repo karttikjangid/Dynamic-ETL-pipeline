@@ -6,9 +6,22 @@ from pathlib import Path
 
 import pytest
 
+from typing import Iterable, Set
+
 from services.pipeline_service import process_upload
 from services import query_service, schema_service
 from tests.payloads import TEST_PAYLOADS
+
+
+def _get_table_with_fields(schema, required_fields: Iterable[str]) -> str:
+    required: Set[str] = set(required_fields)
+    assert required, "required_fields cannot be empty"
+    assert schema.tabular_groups, "Expected at least one tabular group"
+    for group in schema.tabular_groups:
+        field_names = {field.name for field in group.fields}
+        if required.issubset(field_names):
+            return group.table_name
+    raise AssertionError(f"No tabular group contains fields: {sorted(required)}")
 
 
 @pytest.mark.integration
@@ -40,11 +53,18 @@ def test_process_upload_and_query_roundtrip(tmp_path):
         "session_id",
         "device_type",
     }.issubset(field_names)
+    assert schema.tabular_groups and len(schema.tabular_groups) >= 1
+
+    table_name = _get_table_with_fields(
+        schema,
+        ["transaction_id", "status", "amount"],
+    )
 
     status_query = query_service.execute_query(
         source_id,
         {
             "engine": "sqlite",
+            "table": table_name,
             "select": ["transaction_id", "status", "amount"],
             "where": {"status": "completed"},
             "limit": 10,
@@ -83,10 +103,13 @@ def test_markdown_upload_with_code_blocks_and_html(tmp_path):
     assert json_block_query.result_count == 1
     assert json_block_query.results[0]["username"] == "code_block_user"
 
+    kv_table = _get_table_with_fields(schema, ["actual_field", "real_data"])
+
     kv_query = query_service.execute_query(
         source_id,
         {
             "engine": "sqlite",
+            "table": kv_table,
             "select": ["actual_field", "real_data"],
             "where": {"actual_field": "actual_value"},
         },
@@ -152,16 +175,24 @@ def test_sqlite_engine_query_execution(tmp_path):
     response = process_upload(str(sample_file), source_id)
 
     assert response.status == "success"
+    assert response.evidence is not None
     assert response.evidence["storage"].get("sqlite_inserted", 0) >= 1
 
     schema = schema_service.get_current_schema(source_id)
     assert "sqlite" in schema.compatible_dbs
+    assert schema.tabular_groups and len(schema.tabular_groups) >= 1
 
     # Query CSV-derived account balances using SQLite engine
+    account_table = _get_table_with_fields(
+        schema,
+        ["account_id", "branch_code", "currency", "balance", "status"],
+    )
+
     account_query = query_service.execute_query(
         source_id,
         {
             "engine": "sqlite",
+            "table": account_table,
             "select": ["account_id", "branch_code", "currency", "balance", "status"],
             "where": {
                 "status": "active",
@@ -177,10 +208,16 @@ def test_sqlite_engine_query_execution(tmp_path):
     assert account_query.query["engine"] == "sqlite"
 
     # Query HTML-derived SLA rows using pattern matching
+    sla_table = _get_table_with_fields(
+        schema,
+        ["branch_code", "ticket_tier", "response_minutes", "resolution_hours"],
+    )
+
     sla_query = query_service.execute_query(
         source_id,
         {
             "engine": "sqlite",
+            "table": sla_table,
             "select": ["branch_code", "ticket_tier", "response_minutes", "resolution_hours"],
             "where": {
                 "ticket_tier": {"$like": "tier-b%"},
@@ -211,17 +248,25 @@ def test_mixed_tier_b_fixture_supports_dual_storage(tmp_path):
     response = process_upload(str(sample_file), source_id)
 
     assert response.status == "success"
+    assert response.evidence is not None
     storage_evidence = response.evidence.get("storage", {})
     assert storage_evidence.get("sqlite_inserted", 0) >= 1
     assert storage_evidence.get("mongodb_inserted", 0) >= 1
 
     schema = schema_service.get_current_schema(source_id)
     assert {"sqlite", "mongodb"}.issubset(schema.compatible_dbs)
+    assert schema.tabular_groups and len(schema.tabular_groups) >= 1
+
+    sqlite_table = _get_table_with_fields(
+        schema,
+        ["account_id", "status", "balance", "region"],
+    )
 
     sqlite_query = query_service.execute_query(
         source_id,
         {
             "engine": "sqlite",
+            "table": sqlite_table,
             "select": ["account_id", "status", "balance", "region"],
             "where": {"status": "active"},
             "limit": 5,

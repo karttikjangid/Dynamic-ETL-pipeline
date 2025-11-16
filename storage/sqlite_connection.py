@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from threading import Lock
-from typing import Optional
+from typing import Dict, Optional
 
 from config import get_settings
 
@@ -18,84 +18,105 @@ class SQLiteConnection:
 
     def __init__(self, db_path: Optional[str] = None) -> None:
         """Initialize SQLite connection manager.
-        
+
         Args:
-            db_path: Path to SQLite database file. If None, uses default from settings.
+            db_path: Optional default database path. Additional per-version paths
+                will be opened on demand.
         """
         self._settings = get_settings()
-        
+
         if db_path is None:
-            # Default: create a data directory and use etl_pipeline.db
-            data_dir = Path("./data/sqlite")
-            data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(data_dir / "etl_pipeline.db")
-        
-        self._db_path = db_path
-        self._connection: Optional[sqlite3.Connection] = None
+            default_path = Path(self._settings.sqlite_db_path).expanduser()
+            default_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path = str(default_path)
 
-    def connect(self) -> sqlite3.Connection:
-        """Establish a new SQLite connection."""
-        if self._connection is None:
-            self._connection = sqlite3.connect(
-                self._db_path,
-                check_same_thread=False,  # Allow multi-threaded access
-                isolation_level=None  # Autocommit mode
-            )
-            # Enable foreign keys
-            self._connection.execute("PRAGMA foreign_keys = ON")
-            # Use Row factory for dict-like access
-            self._connection.row_factory = sqlite3.Row
-        return self._connection
+        self._default_path = db_path
+        self._connections: Dict[str, sqlite3.Connection] = {}
 
-    def disconnect(self) -> None:
-        """Close the SQLite connection if present."""
-        if self._connection is not None:
-            self._connection.close()
-            self._connection = None
+    def connect(self, db_path: Optional[str] = None) -> sqlite3.Connection:
+        """Establish (or reuse) a SQLite connection for a given db path."""
 
-    def get_connection(self) -> sqlite3.Connection:
-        """Return the active SQLite connection, connecting if necessary."""
-        if self._connection is None:
-            return self.connect()
-        return self._connection
+        target = db_path or self._default_path
+        if target in self._connections:
+            return self._connections[target]
 
-    def execute(self, query: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
+        Path(target).parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(
+            target,
+            check_same_thread=False,
+            isolation_level=None,
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.row_factory = sqlite3.Row
+        self._connections[target] = connection
+        return connection
+
+    def disconnect(self, db_path: Optional[str] = None) -> None:
+        """Close one or all SQLite connections."""
+
+        if db_path:
+            connection = self._connections.pop(db_path, None)
+            if connection is not None:
+                connection.close()
+            return
+
+        for connection in self._connections.values():
+            connection.close()
+        self._connections.clear()
+
+    def get_connection(self, db_path: Optional[str] = None) -> sqlite3.Connection:
+        """Return a SQLite connection for the provided path."""
+
+        return self.connect(db_path)
+
+    def execute(self, query: str, params: Optional[tuple] = None, db_path: Optional[str] = None) -> sqlite3.Cursor:
         """Execute a query with optional parameters.
-        
+
         Args:
             query: SQL query string
             params: Optional tuple of parameters for parameterized queries
+            db_path: Database file path. Defaults to shared database file.
             
         Returns:
             Cursor object with query results
         """
-        conn = self.get_connection()
+        conn = self.get_connection(db_path)
         if params:
             return conn.execute(query, params)
         return conn.execute(query)
 
-    def executemany(self, query: str, params_list: list) -> sqlite3.Cursor:
+    def executemany(
+        self,
+        query: str,
+        params_list: list,
+        db_path: Optional[str] = None,
+    ) -> sqlite3.Cursor:
         """Execute a query with multiple parameter sets.
-        
+
         Args:
             query: SQL query string
             params_list: List of parameter tuples
+            db_path: Database file path
             
         Returns:
             Cursor object
         """
-        conn = self.get_connection()
+        conn = self.get_connection(db_path)
         return conn.executemany(query, params_list)
 
-    def commit(self) -> None:
-        """Commit current transaction."""
-        if self._connection:
-            self._connection.commit()
+    def commit(self, db_path: Optional[str] = None) -> None:
+        """Commit current transaction for a connection."""
 
-    def rollback(self) -> None:
-        """Rollback current transaction."""
-        if self._connection:
-            self._connection.rollback()
+        connection = self._connections.get(db_path or self._default_path)
+        if connection:
+            connection.commit()
+
+    def rollback(self, db_path: Optional[str] = None) -> None:
+        """Rollback current transaction for a connection."""
+
+        connection = self._connections.get(db_path or self._default_path)
+        if connection:
+            connection.rollback()
 
     @staticmethod
     def get_instance() -> "SQLiteConnection":

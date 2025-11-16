@@ -8,12 +8,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from bson import ObjectId
 from pymongo.errors import PyMongoError
 
-from core import QueryResult
+from core import QueryResult, TabularSchemaGroup
 from core.exceptions import QueryExecutionError, SchemaInferenceError
 from services import orchestrator as service_orchestrator, schema_service
 from storage.connection import MongoConnection
 from storage.sqlite_connection import SQLiteConnection
-from storage.sqlite_table_manager import get_table_columns, get_table_name, table_exists
+from storage.sqlite_table_manager import get_table_columns, table_exists
+from storage.sqlite_db_locator import get_version_db_path
 from utils.logger import get_logger
 
 
@@ -81,13 +82,17 @@ def _execute_sqlite_query(source_id: str, query: Dict[str, Any]) -> QueryResult:
 
     if "sqlite" not in (schema.compatible_dbs or []):
         raise QueryExecutionError("Source is not stored in SQLite.")
+    if not schema.tabular_groups:
+        raise QueryExecutionError("No tabular groups available for this source.")
 
-    table_name = get_table_name(source_id, schema.version)
+    table_metadata = _select_tabular_group(schema.tabular_groups, query)
+    table_name = table_metadata.table_name
+    db_path = get_version_db_path(source_id, schema.version)
     conn = SQLiteConnection.get_instance()
-    if not table_exists(conn, table_name):
+    if not table_exists(conn, db_path, table_name):
         raise QueryExecutionError("SQLite table for source does not exist.")
 
-    columns = get_table_columns(conn, table_name)
+    columns = get_table_columns(conn, db_path, table_name)
     select_clause = _build_select_clause(query.get("select"), columns)
     where_clause, params = _build_where_clause(query.get("where"), columns)
     order_clause = _build_order_by_clause(query.get("order_by"), columns)
@@ -103,7 +108,7 @@ def _execute_sqlite_query(source_id: str, query: Dict[str, Any]) -> QueryResult:
     sql = " ".join(sql_parts)
 
     started = time.perf_counter()
-    cursor = conn.execute(sql, tuple(params))
+    cursor = conn.execute(sql, tuple(params), db_path=db_path)
     rows = cursor.fetchall()
     elapsed_ms = (time.perf_counter() - started) * 1000
 
@@ -111,6 +116,7 @@ def _execute_sqlite_query(source_id: str, query: Dict[str, Any]) -> QueryResult:
     return QueryResult(
         query={
             "engine": "sqlite",
+            "table": table_name,
             "sql": sql,
             "select": query.get("select"),
             "where": query.get("where"),
@@ -129,7 +135,6 @@ def _normalize_mongo_query_payload(query: Dict[str, Any]) -> Tuple[Dict[str, Any
         filter_query = {}
     if not isinstance(filter_query, dict):
         raise QueryExecutionError("Query 'filter' must be a dictionary")
-
     limit_value = _normalize_limit(query.get("limit", DEFAULT_LIMIT), allow_zero=True)
     sort_spec = _normalize_sort(query.get("sort"))
     return filter_query, limit_value, sort_spec
@@ -302,3 +307,18 @@ def _serialize_documents(documents: Sequence[Dict[str, Any]]) -> List[Dict[str, 
             prepared["_id"] = str(identifier)
         serialized.append(prepared)
     return serialized
+
+
+def _select_tabular_group(
+    groups: List[TabularSchemaGroup],
+    query: Dict[str, Any],
+) -> TabularSchemaGroup:
+    requested = query.get("table") or query.get("group_id")
+    if requested:
+        for group in groups:
+            if group.table_name == requested or group.group_id == requested:
+                return group
+        raise QueryExecutionError(
+            f"Table '{requested}' is not available for this source."
+        )
+    return groups[0]

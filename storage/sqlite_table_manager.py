@@ -1,8 +1,8 @@
 """SQLite table manager for Tier-B structured data storage."""
 
-from typing import Any, Dict, List, Optional
+from typing import List
 
-from core.models import SchemaMetadata, SchemaField
+from core.models import SchemaField
 from storage.sqlite_connection import SQLiteConnection
 from utils.logger import get_logger
 
@@ -11,19 +11,11 @@ logger = get_logger(__name__)
 
 def create_table_from_schema(
     conn: SQLiteConnection,
+    db_path: str,
     table_name: str,
-    schema: SchemaMetadata
+    fields: List[SchemaField],
 ) -> bool:
-    """Create a SQLite table from schema metadata.
-    
-    Args:
-        conn: SQLite connection
-        table_name: Name of table to create
-        schema: Schema metadata with field definitions
-        
-    Returns:
-        True if successful
-    """
+    """Create a SQLite table from schema field definitions."""
     try:
         # Build CREATE TABLE statement
         columns = []
@@ -32,7 +24,7 @@ def create_table_from_schema(
         columns.append("_id INTEGER PRIMARY KEY AUTOINCREMENT")
         
         # Add schema fields
-        for field in schema.fields:
+        for field in fields:
             col_name = field.name
             col_type = _map_type_to_sqlite(field.type)
             nullable = "NULL" if field.nullable else "NOT NULL"
@@ -48,23 +40,22 @@ def create_table_from_schema(
             {', '.join(columns)}
         )
         """
-        
-        conn.execute(create_sql)
-        logger.info(f"Created table '{table_name}' with {len(schema.fields)} columns")
-        
+
+        conn.execute(create_sql, db_path=db_path)
+        logger.info(f"Created table '{table_name}' with {len(fields)} columns in {db_path}")
+
         # Create indexes for suggested fields
-        for field in schema.fields:
+        for field in fields:
             if field.suggested_index:
-                create_index(conn, table_name, field.name)
-        
+                create_index(conn, db_path, table_name, field.name)
+
         return True
-        
     except Exception as e:
         logger.error(f"Failed to create table '{table_name}': {e}")
         return False
 
 
-def create_index(conn: SQLiteConnection, table_name: str, column_name: str) -> bool:
+def create_index(conn: SQLiteConnection, db_path: str, table_name: str, column_name: str) -> bool:
     """Create an index on a table column.
     
     Args:
@@ -78,7 +69,7 @@ def create_index(conn: SQLiteConnection, table_name: str, column_name: str) -> b
     try:
         index_name = f"idx_{table_name}_{column_name}"
         index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name}({column_name})"
-        conn.execute(index_sql)
+        conn.execute(index_sql, db_path=db_path)
         logger.info(f"Created index '{index_name}'")
         return True
     except Exception as e:
@@ -111,22 +102,7 @@ def _map_type_to_sqlite(field_type: str) -> str:
     return type_mapping.get(field_type.lower(), "TEXT")
 
 
-def get_table_name(source_id: str, version: int) -> str:
-    """Generate versioned table name.
-    
-    Args:
-        source_id: Source identifier
-        version: Schema version
-        
-    Returns:
-        Table name like "source_id_v1"
-    """
-    # Sanitize source_id for SQL
-    safe_source_id = source_id.replace("-", "_").replace(".", "_")
-    return f"{safe_source_id}_v{version}"
-
-
-def table_exists(conn: SQLiteConnection, table_name: str) -> bool:
+def table_exists(conn: SQLiteConnection, db_path: str, table_name: str) -> bool:
     """Check if a table exists.
     
     Args:
@@ -138,12 +114,13 @@ def table_exists(conn: SQLiteConnection, table_name: str) -> bool:
     """
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        (table_name,)
+        (table_name,),
+        db_path=db_path,
     )
     return cursor.fetchone() is not None
 
 
-def get_table_columns(conn: SQLiteConnection, table_name: str) -> List[str]:
+def get_table_columns(conn: SQLiteConnection, db_path: str, table_name: str) -> List[str]:
     """Get list of column names in a table.
     
     Args:
@@ -153,6 +130,6 @@ def get_table_columns(conn: SQLiteConnection, table_name: str) -> List[str]:
     Returns:
         List of column names
     """
-    cursor = conn.execute(f"PRAGMA table_info({table_name})")
+    cursor = conn.execute(f"PRAGMA table_info({table_name})", db_path=db_path)
     rows = cursor.fetchall()
     return [row[1] for row in rows]  # Column name is at index 1

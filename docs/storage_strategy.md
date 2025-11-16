@@ -11,7 +11,7 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
 | Backend | Purpose | Data Types | Schema Handling | Versioning | Location |
 |---------|---------|------------|-----------------|------------|----------|
 | **MongoDB** | Complex/nested data | `json`, `yaml_block` | JSON Schema validation | Schema-level versioning | Collections: `{source_id}_records` |
-| **SQLite** | Tabular/structured data | `html_table`, `csv_block`, `kv` | Relational tables | Table-level versioning | Tables: `{source_id}_v{version}` |
+| **SQLite** | Tabular/structured data | `html_table`, `csv_block`, `kv` | Relational tables grouped per schema | DB-per-version, table-level | File: `data/sqlite/{source_id}/v{version}.db` |
 
 ## Data Routing Criteria
 
@@ -63,9 +63,15 @@ The pipeline employs a **hybrid multi-backend approach** with intelligent data r
 - Array fields handled as separate tables when needed
 
 #### Storage Location
-- **Database File**: `./data/sqlite/etl_pipeline.db`
-- **Single file** for entire SQLite storage
-- Automatic directory creation
+- **Database Files**: `./data/sqlite/{source_id}/v{version}.db`
+- **One file per schema version**; files are created lazily when SQLite fragments exist
+- Automatic directory creation (customize base via `ETL_SQLITE_BASE_DIR`)
+
+#### Table Grouping (NER-aware)
+- Each SQLite-eligible fragment computes a signature using normalized field names + detected NER labels.
+- Fragments with Jaccard similarity ≥ 0.7 on fields **and** ≥ 0.5 on labels reuse the same table; everything else spawns additional tables within the same version DB.
+- Table names follow `{safe_source}_v{version}_{signature[:8]}` ensuring deterministic reuse.
+- Per-table schema metadata is persisted inside `SchemaMetadata.tabular_groups`, allowing downstream services (e.g., queries) to enumerate available tables.
 
 ## Schema Compatibility Determination
 
@@ -186,7 +192,8 @@ MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=etl_pipeline
 
 # SQLite Configuration (automatic)
-SQLITE_DB_PATH=./data/sqlite/etl_pipeline.db
+ETL_SQLITE_DB_PATH=./data/sqlite/etl_pipeline.db        # Legacy single-file fallback
+ETL_SQLITE_BASE_DIR=./data/sqlite                       # Root folder for per-version DBs
 ```
 
 ### Connection Management

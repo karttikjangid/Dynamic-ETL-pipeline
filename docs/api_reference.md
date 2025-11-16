@@ -112,7 +112,19 @@ curl -X POST \
       "json_fragments": 45,
       "kv_pairs": 100,
       "total_processed": 145
-    }
+    },
+    "tabular_groups": [
+      {
+        "group_id": "grp_01",
+        "table_name": "user_profiles_v1_a1b2c3d4",
+        "signature": "a1b2c3d4e5f6",
+        "record_count": 62,
+        "fields": [
+          {"name": "account_id", "type": "string", "nullable": false},
+          {"name": "balance", "type": "number", "nullable": false}
+        ]
+      }
+    ]
   }
 }
 ```
@@ -369,6 +381,7 @@ POST /query
 ```json
 {
   "engine": "sqlite",
+  "table": "user_profiles_v1_a1b2c3d4",
   "where": {
     "field_name": {"$operator": "value"}
   },
@@ -377,6 +390,8 @@ POST /query
   "limit": 50
 }
 ```
+
+> ℹ️ When using the SQLite engine, include either `table` (preferred) or `group_id` to target a specific tabular group inside the per-version database. If omitted, the first available table is queried.
 
 #### Supported Operators
 
@@ -428,6 +443,7 @@ curl -X POST "http://localhost:8000/query?source_id=user_profiles" \
   -H "Content-Type: application/json" \
   -d '{
     "engine": "sqlite",
+    "table": "user_profiles_v1_a1b2c3d4",
     "where": {
       "score": {"$gte": 80}
     },
@@ -466,7 +482,8 @@ curl -X POST "http://localhost:8000/query?source_id=user_profiles" \
 {
   "query": {
     "engine": "sqlite",
-    "sql": "SELECT id, name, score FROM user_profiles_v2 WHERE score >= ? ORDER BY score DESC LIMIT ?",
+    "table": "user_profiles_v1_a1b2c3d4",
+    "sql": "SELECT id, name, score FROM user_profiles_v1_a1b2c3d4 WHERE score >= ? ORDER BY score DESC LIMIT ?",
     "select": ["id", "name", "score"],
     "where": {"score": {"$gte": 80}},
     "order_by": [["score", "desc"]],

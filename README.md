@@ -83,6 +83,14 @@ Quick links to deep-dive documentation:
 - **[Test Plan](docs/TEST_PLAN_TIERED.md)** – Testing strategy and validation
 
 
+## SQLite storage model
+
+- Every schema version now receives its own SQLite database file under `data/sqlite/{source_id}/v{version}.db`.
+- CSV / KV / HTML fragments are clustered into tables by comparing field names plus spaCy NER labels, so related fragments land in the same table while divergent fragments spawn new tables.
+- Table names follow the pattern `{source_id}_v{version}_{hash}`; the hash is derived from the schema signature so uploads that share the same structure reuse the same table automatically.
+- When querying with `{"engine": "sqlite"}`, add a `table` (or `group_id`) property to target a specific table. If omitted, the query service defaults to the first tabular group for that version.
+
+
 
 ## Roadmap
 

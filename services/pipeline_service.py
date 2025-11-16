@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from core import NormalizedRecord, SchemaMetadata, UploadResponse
+from core import NormalizedRecord, SchemaMetadata, TabularSchemaGroup, UploadResponse
 from core.constants import DEFAULT_BATCH_SIZE, SCHEMA_ID_TEMPLATE
 from core.exceptions import (
     ExtractionError,
@@ -22,9 +22,11 @@ from services.ner_service import apply_ner_to_fragments
 from storage import collection_manager, document_inserter, schema_store
 from storage.connection import MongoConnection
 from storage.sqlite_connection import SQLiteConnection
-from storage.sqlite_table_manager import create_table_from_schema, get_table_name
+from storage.sqlite_table_manager import create_table_from_schema
 from storage.sqlite_document_inserter import batch_insert_documents_sqlite
 from storage.storage_router import categorize_records_by_storage, get_compatible_dbs_for_schema
+from storage.sqlite_db_locator import get_version_db_path
+from services.schema_grouping_service import group_tabular_documents
 from utils.logger import get_logger
 
 
@@ -119,6 +121,10 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
             LOGGER.warning("NER processing failed for source '%s': %s", source_id, exc)
             evidence["ner"] = {"status": "failed", "error": str(exc)}
 
+    # Keep NormalizedRecord instances in sync with enriched docs
+    for idx, record in enumerate(normalized_records):
+        record.data = normalized_docs[idx]
+
     records_normalized = len(normalized_docs)
 
     if records_normalized == 0:
@@ -169,16 +175,6 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
     )
     active_schema = existing_schema if duplicate_upload and existing_schema else prepared_schema
 
-    sqlite_schema_versioned: Optional[SchemaMetadata] = None
-    if sqlite_schema:
-        sqlite_schema_versioned = sqlite_schema.model_copy(
-            update={
-                "version": target_version,
-                "schema_id": f"{schema_id}__sqlite",
-                "extraction_stats": combined_stats,
-            }
-        )
-
     if existing_schema and not duplicate_upload:
         schema_service.handle_schema_evolution(source_id, existing_schema, prepared_schema)
 
@@ -202,38 +198,61 @@ def process_upload(file_path: str, source_id: str, enable_ner: bool = True) -> U
         )
         LOGGER.info(f"Inserted {mongodb_inserted} records into MongoDB")
 
+    tabular_groups: List[TabularSchemaGroup] = []
+
     # SQLite storage (for CSV/HTML/KV)
-    if (
-        sqlite_records
-        and "sqlite" in prepared_schema.compatible_dbs
-        and sqlite_schema_versioned is not None
-    ):
-        table_name = get_table_name(source_id, target_version)
-
-        if not duplicate_upload:
-            table_created = create_table_from_schema(
-                sqlite_connection, table_name, sqlite_schema_versioned
-            )
-            if not table_created:
-                raise StorageError("Failed to prepare SQLite table")
-
+    if sqlite_records:
+        db_path = get_version_db_path(source_id, target_version)
         sqlite_docs = _serialize_normalized_records(sqlite_records)
-        sqlite_inserted = batch_insert_documents_sqlite(
-            sqlite_connection, table_name, sqlite_docs, source_id
-        )
-        LOGGER.info(f"Inserted {sqlite_inserted} records into SQLite table '{table_name}'")
+        group_plans = group_tabular_documents(sqlite_docs, source_id, target_version)
+
+        for plan in group_plans:
+            tabular_groups.append(plan.group)
+            if not duplicate_upload:
+                table_created = create_table_from_schema(
+                    sqlite_connection,
+                    db_path,
+                    plan.group.table_name,
+                    plan.group.fields,
+                )
+                if not table_created:
+                    raise StorageError(f"Failed to prepare SQLite table '{plan.group.table_name}'")
+
+            inserted_count = batch_insert_documents_sqlite(
+                sqlite_connection,
+                db_path,
+                plan.group.table_name,
+                plan.documents,
+                source_id,
+            )
+            sqlite_inserted += inserted_count
+            LOGGER.info(
+                "Inserted %d records into SQLite table '%s' (db=%s)",
+                inserted_count,
+                plan.group.table_name,
+                db_path,
+            )
+
+        if tabular_groups:
+            if "sqlite" not in prepared_schema.compatible_dbs:
+                prepared_schema.compatible_dbs.append("sqlite")
+            prepared_schema.tabular_groups = tabular_groups
 
     inserted = mongodb_inserted + sqlite_inserted
-    evidence["storage"] = {
+    storage_summary: Dict[str, Any] = {
         "mongodb_inserted": mongodb_inserted,
         "sqlite_inserted": sqlite_inserted,
-        "total_inserted": inserted
+        "total_inserted": inserted,
     }
+    if tabular_groups:
+        storage_summary["sqlite_tables"] = [group.table_name for group in tabular_groups]
+    evidence["storage"] = storage_summary
 
     if inserted == 0:
         LOGGER.warning("No documents inserted for source '%s'", source_id)
 
-    if not duplicate_upload:
+    should_persist_schema = (not duplicate_upload) or (tabular_groups != [])
+    if should_persist_schema:
         if not schema_store.store_schema(db, prepared_schema):
             raise StorageError("Failed to persist schema metadata")
 

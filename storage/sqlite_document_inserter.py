@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 def insert_documents_sqlite(
     conn: SQLiteConnection,
+    db_path: str,
     table_name: str,
     documents: List[Dict[str, Any]],
     source_id: str,
@@ -34,7 +35,7 @@ def insert_documents_sqlite(
         return 0
     
     # Get table columns
-    columns = get_table_columns(conn, table_name)
+    columns = get_table_columns(conn, db_path, table_name)
     
     # Remove metadata columns from consideration
     data_columns = [c for c in columns if not c.startswith('_')]
@@ -63,7 +64,7 @@ def insert_documents_sqlite(
             col_list = ', '.join(col_names)
             
             insert_sql = f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})"
-            conn.execute(insert_sql, tuple(values.values()))
+            conn.execute(insert_sql, tuple(values.values()), db_path=db_path)
             
             inserted_count += 1
             
@@ -130,6 +131,7 @@ def serialize_value(value: Any) -> Any:
 
 def batch_insert_documents_sqlite(
     conn: SQLiteConnection,
+    db_path: str,
     table_name: str,
     documents: List[Dict[str, Any]],
     source_id: str,
@@ -151,7 +153,7 @@ def batch_insert_documents_sqlite(
     
     for i in range(0, len(documents), batch_size):
         batch = documents[i:i + batch_size]
-        count = insert_documents_sqlite(conn, table_name, batch, source_id)
+        count = insert_documents_sqlite(conn, db_path, table_name, batch, source_id)
         total_inserted += count
     
     return total_inserted

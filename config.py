@@ -61,7 +61,8 @@ class Settings(BaseSettings):
     mongodb_uri: str = Field(default_factory=_load_mongo_uri_from_env)
     mongodb_database: str = "etl_db"  # Single fixed database for entire ETL pipeline
     database_prefix: str = "etl_"
-    sqlite_db_path: str = "./data/sqlite/etl_pipeline.db"  # Tier-B: SQLite database path
+    sqlite_db_path: str = "./data/sqlite/etl_pipeline.db"  # Tier-B: legacy SQLite database path
+    sqlite_base_dir: str = "./data/sqlite"  # Base dir for per-version DB files
     environment: str = "development"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
